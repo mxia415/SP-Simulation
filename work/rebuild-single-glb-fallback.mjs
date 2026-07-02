@@ -8,7 +8,7 @@ if (!name || !fallbackKey || !jsFile) {
   throw new Error("usage: node work/rebuild-single-glb-fallback.mjs <name> <fallbackKey> <jsFile>");
 }
 
-const assetDir = path.resolve("outputs/lingzhu-control/assets");
+const assetDir = path.resolve("outputs/html-version/assets");
 const glbPath = path.join(assetDir, `${name}.glb`);
 const gzPath = path.join(assetDir, `${name}.glb.gz`);
 const jsPath = path.join(assetDir, jsFile);

@@ -4,6 +4,8 @@ outputs/sps_qt_gui/runtime/
 outputs/sps_qt_gui/dist/
 outputs/lingzhu-control/assets/raw/
 outputs/lingzhu-control/assets/processed/
+outputs/html-version/assets/raw/
+outputs/html-version/assets/processed/
 inputs/glb-models/
 .DS_Store
 **/.DS_Store

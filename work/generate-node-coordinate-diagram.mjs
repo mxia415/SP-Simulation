@@ -1,7 +1,7 @@
 import { writeFileSync } from "node:fs";
 import { pathToFileURL } from "node:url";
 import { createRequire } from "node:module";
-import { DEFAULT_STATE, computePose } from "../outputs/lingzhu-control/model.mjs";
+import { DEFAULT_STATE, computePose } from "../outputs/html-version/model.mjs";
 
 const require = createRequire(import.meta.url);
 const { chromium } = require("./node_modules/playwright");

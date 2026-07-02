@@ -1,8 +1,8 @@
 import { readFile } from "node:fs/promises";
 import { strict as assert } from "node:assert";
 
-const htmlPath = new URL("../outputs/lingzhu-control/preview.html", import.meta.url);
-const scriptPath = new URL("../outputs/lingzhu-control/preview-arctic.mjs", import.meta.url);
+const htmlPath = new URL("../outputs/html-version/preview.html", import.meta.url);
+const scriptPath = new URL("../outputs/html-version/preview-arctic.mjs", import.meta.url);
 
 const html = await readFile(htmlPath, "utf8");
 const script = await readFile(scriptPath, "utf8");

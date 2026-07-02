@@ -19,7 +19,7 @@ import {
   solveStateForWorldDisplayedToolTarget,
   solveStateForToolTarget,
   worldDisplayedToolPointForState,
-} from "../outputs/lingzhu-control/model.mjs";
+} from "../outputs/html-version/model.mjs";
 
 const closeTo = (actual, expected, tolerance = 0.01) => {
   assert.ok(

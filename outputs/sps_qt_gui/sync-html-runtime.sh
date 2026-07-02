@@ -2,7 +2,7 @@
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
-SOURCE="$ROOT/outputs/lingzhu-control"
+SOURCE="$ROOT/outputs/html-version"
 TARGET="$ROOT/outputs/sps_qt_gui/runtime/lingzhu-control"
 
 if [[ ! -f "$SOURCE/index.html" ]]; then

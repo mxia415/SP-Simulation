@@ -2,7 +2,7 @@ import fs from "node:fs";
 import path from "node:path";
 import zlib from "node:zlib";
 
-const assetDir = path.resolve("outputs/lingzhu-control/assets");
+const assetDir = path.resolve("outputs/html-version/assets");
 const items = [
   ["base", "base", "base-model.js"],
   ["base_link", "baseLink", "base-link-model.js"],

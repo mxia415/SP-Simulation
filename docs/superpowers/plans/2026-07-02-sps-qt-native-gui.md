@@ -29,7 +29,7 @@
 - Create: `outputs/sps_qt_gui/src/SpsModel.h`
 - Create: `outputs/sps_qt_gui/src/SpsModel.cpp`
 
-- [x] Port constants and pose calculation from `outputs/lingzhu-control/model.mjs`.
+- [x] Port constants and pose calculation from `outputs/html-version/model.mjs`.
 - [x] Include angle clamp, preset, actuator stroke, displayed tool point, linkage solve, and linear target solve.
 - [x] Verify default pose and key values match the existing command-line C++ test.
 
@@ -44,7 +44,7 @@
 - [x] Build left panel with title, READY status, mode segmented buttons, angle controls, stroke controls, linear controls, and presets.
 - [x] Build center stage with black background, HUDs, axis labels, view buttons, model/path drawing.
 - [x] Build right panel with model display toggles, effect selector, collapsible model tuners, and metric readouts.
-- [x] Apply Qt stylesheet approximating `outputs/lingzhu-control/styles.css`.
+- [x] Apply Qt stylesheet approximating `outputs/html-version/styles.css`.
 
 ### Task 4: Verification
 
