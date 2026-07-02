@@ -1,0 +1,13 @@
+work/node_modules/
+outputs/sps_qt_gui/build/
+outputs/sps_qt_gui/runtime/
+outputs/sps_qt_gui/dist/
+outputs/lingzhu-control/assets/raw/
+outputs/lingzhu-control/assets/processed/
+inputs/glb-models/
+.DS_Store
+**/.DS_Store
+__pycache__/
+*.pyc
+*.o
+*.o.d

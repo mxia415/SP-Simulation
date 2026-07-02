@@ -1,0 +1,686 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>SP-S模拟</title>
+    <link rel="icon" href="data:," />
+    <link rel="stylesheet" href="./styles.css?v=20260702-qt-hybrid-stage" />
+  </head>
+  <body>
+    <main class="shell">
+      <section class="left-panel" aria-label="控制面板">
+        <header class="brand">
+          <div>
+            <p class="eyebrow">GL-3DPRT-SP Simulation</p>
+            <h1>SP-S模拟</h1>
+            <p class="version-line">V1.0 · 2026-07-02· ©Ming Xia</p>
+          </div>
+        </header>
+
+        <div class="mode-switch" aria-label="驱动模式">
+          <button class="mode-button is-active" id="angleModeButton" type="button">角度驱动</button>
+          <button class="mode-button" id="strokeModeButton" type="button">电缸行程驱动</button>
+          <button class="mode-button" id="linearModeButton" type="button">线性驱动</button>
+        </div>
+
+        <div class="control-stack" id="controls"></div>
+        <div class="control-stack" id="strokeControls" hidden></div>
+        <div class="control-stack" id="linearControls" hidden></div>
+
+        <section class="preset-band" aria-label="姿态预设">
+          <div class="section-title">
+            <span>姿态预设</span>
+            <button class="icon-button" id="resetButton" type="button" title="恢复 GH 默认值" aria-label="恢复 GH 默认值">
+              R
+            </button>
+          </div>
+          <div class="preset-grid" id="presets"></div>
+        </section>
+      </section>
+
+      <section class="stage" aria-label="三维预览">
+        <canvas id="viewport"></canvas>
+        <div class="hud top-left">
+          <span>GH Chain</span>
+          <strong id="chainReadout">90 / 90 / 90 / 0 / 180</strong>
+        </div>
+        <div class="hud bottom-left">
+          <span>Tip XYZ</span>
+          <strong id="tipReadout">0 / 0 mm</strong>
+        </div>
+        <div class="axis-legend" aria-hidden="true">
+          <span class="x">X</span>
+          <span class="y">Z</span>
+          <span class="z">Y</span>
+        </div>
+        <div class="view-controls" aria-label="视角控制">
+          <button type="button" data-view="default">3D视角</button>
+          <button type="button" data-view="top">TOP</button>
+          <button type="button" data-view="front">XZ</button>
+          <button type="button" data-view="side">YZ</button>
+        </div>
+      </section>
+
+      <aside class="right-panel" aria-label="状态读数">
+        <section class="model-panel" aria-label="模型调姿">
+          <p class="eyebrow">MODEL POSE</p>
+          <label class="model-display-toggle">
+            <input id="ballStickVisible" type="checkbox" checked />
+            <span>显示所有球棍模型</span>
+          </label>
+          <label class="model-display-toggle">
+            <input id="actuatorBallStickOnly" type="checkbox" />
+            <span>仅显示电缸球棍模型</span>
+          </label>
+          <label class="model-effect-control">
+            <span>模型效果</span>
+            <select id="modelEffectSelect">
+              <option value="transparent">透明实体</option>
+              <option value="solid" selected>浅色实体</option>
+            </select>
+          </label>
+          <details class="model-tuner" aria-label="底座模型调姿">
+            <summary class="model-tuner-head">
+              <div>
+                <p class="eyebrow">BASE GLB</p>
+                <strong>Base</strong>
+              </div>
+              <span id="baseModelStatus" class="model-status">加载中</span>
+            </summary>
+            <div class="model-tuner-body">
+              <label class="model-display-toggle">
+                <input id="baseModelVisible" type="checkbox" checked />
+                <span>显示</span>
+              </label>
+              <div class="model-tuner-grid">
+                <label>X <input id="baseModelX" type="number" step="10" value="0" /></label>
+                <label>Y <input id="baseModelY" type="number" step="10" value="0" /></label>
+                <label>Z <input id="baseModelZ" type="number" step="10" value="0" /></label>
+                <label>RX <input id="baseModelRx" type="number" step="1" value="0" /></label>
+                <label>RY <input id="baseModelRy" type="number" step="1" value="0" /></label>
+                <label>RZ <input id="baseModelRz" type="number" step="1" value="0" /></label>
+                <label>Scale <input id="baseModelScale" type="number" step="0.01" value="1" /></label>
+                <button id="baseModelReset" type="button">重置</button>
+              </div>
+            </div>
+          </details>
+          <details class="model-tuner" aria-label="旋转体模型调姿">
+            <summary class="model-tuner-head">
+              <div>
+                <p class="eyebrow">BASE_LINK GLB</p>
+                <strong>Base_link</strong>
+              </div>
+              <span id="baseLinkModelStatus" class="model-status">加载中</span>
+            </summary>
+            <div class="model-tuner-body">
+              <label class="model-display-toggle">
+                <input id="baseLinkModelVisible" type="checkbox" checked />
+                <span>显示</span>
+              </label>
+              <div class="model-tuner-grid">
+                <label>X <input id="baseLinkModelX" type="number" step="10" value="0" /></label>
+                <label>Y <input id="baseLinkModelY" type="number" step="10" value="0" /></label>
+                <label>Z <input id="baseLinkModelZ" type="number" step="10" value="0" /></label>
+                <label>RX <input id="baseLinkModelRx" type="number" step="1" value="0" /></label>
+                <label>RY <input id="baseLinkModelRy" type="number" step="1" value="0" /></label>
+                <label>RZ <input id="baseLinkModelRz" type="number" step="1" value="0" /></label>
+                <label>Scale <input id="baseLinkModelScale" type="number" step="0.01" value="1" /></label>
+                <button id="baseLinkModelReset" type="button">重置</button>
+              </div>
+            </div>
+          </details>
+          <details class="model-tuner" aria-label="臂1模型调姿">
+            <summary class="model-tuner-head">
+              <div>
+                <p class="eyebrow">ARM1 GLB</p>
+                <strong>Arm1</strong>
+              </div>
+              <span id="arm1ModelStatus" class="model-status">加载中</span>
+            </summary>
+            <div class="model-tuner-body">
+              <label class="model-display-toggle">
+                <input id="arm1ModelVisible" type="checkbox" checked />
+                <span>显示</span>
+              </label>
+              <div class="model-tuner-grid">
+                <label>X <input id="arm1ModelX" type="number" step="10" value="0" /></label>
+                <label>Y <input id="arm1ModelY" type="number" step="10" value="0" /></label>
+                <label>Z <input id="arm1ModelZ" type="number" step="10" value="0" /></label>
+                <label>RX <input id="arm1ModelRx" type="number" step="1" value="0" /></label>
+                <label>RY <input id="arm1ModelRy" type="number" step="1" value="0" /></label>
+                <label>RZ <input id="arm1ModelRz" type="number" step="1" value="0" /></label>
+                <label>Scale <input id="arm1ModelScale" type="number" step="0.01" value="1" /></label>
+                <button id="arm1ModelReset" type="button">重置</button>
+              </div>
+            </div>
+          </details>
+          <details class="model-tuner" aria-label="臂2模型调姿">
+            <summary class="model-tuner-head">
+              <div>
+                <p class="eyebrow">ARM2 GLB</p>
+                <strong>Arm2</strong>
+              </div>
+              <span id="arm2ModelStatus" class="model-status">加载中</span>
+            </summary>
+            <div class="model-tuner-body">
+              <label class="model-display-toggle">
+                <input id="arm2ModelVisible" type="checkbox" checked />
+                <span>显示</span>
+              </label>
+              <div class="model-tuner-grid">
+                <label>X <input id="arm2ModelX" type="number" step="10" value="0" /></label>
+                <label>Y <input id="arm2ModelY" type="number" step="10" value="0" /></label>
+                <label>Z <input id="arm2ModelZ" type="number" step="10" value="0" /></label>
+                <label>RX <input id="arm2ModelRx" type="number" step="1" value="0" /></label>
+                <label>RY <input id="arm2ModelRy" type="number" step="1" value="0" /></label>
+                <label>RZ <input id="arm2ModelRz" type="number" step="1" value="0" /></label>
+                <label>Scale <input id="arm2ModelScale" type="number" step="0.01" value="1" /></label>
+                <button id="arm2ModelReset" type="button">重置</button>
+              </div>
+            </div>
+          </details>
+          <details class="model-tuner" aria-label="臂3模型调姿">
+            <summary class="model-tuner-head">
+              <div>
+                <p class="eyebrow">ARM3 GLB</p>
+                <strong>Arm3</strong>
+              </div>
+              <span id="arm3ModelStatus" class="model-status">加载中</span>
+            </summary>
+            <div class="model-tuner-body">
+              <label class="model-display-toggle">
+                <input id="arm3ModelVisible" type="checkbox" checked />
+                <span>显示</span>
+              </label>
+              <div class="model-tuner-grid">
+                <label>X <input id="arm3ModelX" type="number" step="10" value="0" /></label>
+                <label>Y <input id="arm3ModelY" type="number" step="10" value="0" /></label>
+                <label>Z <input id="arm3ModelZ" type="number" step="10" value="0" /></label>
+                <label>RX <input id="arm3ModelRx" type="number" step="1" value="0" /></label>
+                <label>RY <input id="arm3ModelRy" type="number" step="1" value="0" /></label>
+                <label>RZ <input id="arm3ModelRz" type="number" step="1" value="0" /></label>
+                <label>Scale <input id="arm3ModelScale" type="number" step="0.01" value="1" /></label>
+                <button id="arm3ModelReset" type="button">重置</button>
+              </div>
+            </div>
+          </details>
+          <details class="model-tuner" aria-label="Tool 模型调姿">
+            <summary class="model-tuner-head">
+              <div>
+                <p class="eyebrow">TOOL.GLB</p>
+                <strong>Tool</strong>
+              </div>
+              <span id="toolModelStatus" class="model-status">加载中</span>
+            </summary>
+            <div class="model-tuner-body">
+              <label class="model-display-toggle">
+                <input id="toolModelVisible" type="checkbox" checked />
+                <span>显示</span>
+              </label>
+              <div class="model-tuner-grid">
+                <label>X <input id="toolModelX" type="number" step="10" value="0" /></label>
+                <label>Y <input id="toolModelY" type="number" step="10" value="0" /></label>
+                <label>Z <input id="toolModelZ" type="number" step="10" value="0" /></label>
+                <label>RX <input id="toolModelRx" type="number" step="1" value="0" /></label>
+                <label>RY <input id="toolModelRy" type="number" step="1" value="0" /></label>
+                <label>RZ <input id="toolModelRz" type="number" step="1" value="0" /></label>
+                <label>Scale <input id="toolModelScale" type="number" step="0.01" value="1" /></label>
+                <button id="toolModelReset" type="button">重置</button>
+              </div>
+            </div>
+          </details>
+          <details class="model-tuner" aria-label="电缸1模型调姿">
+            <summary class="model-tuner-head">
+              <div>
+                <p class="eyebrow">CYL1 GLB</p>
+                <strong>电缸1</strong>
+              </div>
+              <span class="model-status">X-/X+ 底部与端部</span>
+            </summary>
+            <div class="model-tuner-body">
+              <div class="model-subgroup">
+                <div class="model-subgroup-head">
+                  <strong>X- 底部</strong>
+                  <span id="cyl1XnBaseModelStatus" class="model-status">加载中</span>
+                </div>
+              <label class="model-display-toggle">
+                <input id="cyl1XnBaseModelVisible" type="checkbox" checked />
+                <span>显示</span>
+              </label>
+              <div class="model-tuner-grid">
+                <label>X <input id="cyl1XnBaseModelX" type="number" step="10" value="0" /></label>
+                <label>Y <input id="cyl1XnBaseModelY" type="number" step="10" value="0" /></label>
+                <label>Z <input id="cyl1XnBaseModelZ" type="number" step="10" value="0" /></label>
+                <label>RX <input id="cyl1XnBaseModelRx" type="number" step="1" value="0" /></label>
+                <label>RY <input id="cyl1XnBaseModelRy" type="number" step="1" value="0" /></label>
+                <label>RZ <input id="cyl1XnBaseModelRz" type="number" step="1" value="0" /></label>
+                <label>Scale <input id="cyl1XnBaseModelScale" type="number" step="0.01" value="1" /></label>
+                <button id="cyl1XnBaseModelReset" type="button">重置</button>
+              </div>
+              </div>
+              <div class="model-subgroup">
+                <div class="model-subgroup-head">
+                  <strong>X- 端部</strong>
+                  <span id="cyl1XnEndModelStatus" class="model-status">加载中</span>
+                </div>
+              <label class="model-display-toggle">
+                <input id="cyl1XnEndModelVisible" type="checkbox" checked />
+                <span>显示</span>
+              </label>
+              <div class="model-tuner-grid">
+                <label>X <input id="cyl1XnEndModelX" type="number" step="10" value="0" /></label>
+                <label>Y <input id="cyl1XnEndModelY" type="number" step="10" value="0" /></label>
+                <label>Z <input id="cyl1XnEndModelZ" type="number" step="10" value="0" /></label>
+                <label>RX <input id="cyl1XnEndModelRx" type="number" step="1" value="0" /></label>
+                <label>RY <input id="cyl1XnEndModelRy" type="number" step="1" value="0" /></label>
+                <label>RZ <input id="cyl1XnEndModelRz" type="number" step="1" value="0" /></label>
+                <label>Scale <input id="cyl1XnEndModelScale" type="number" step="0.01" value="1" /></label>
+                <button id="cyl1XnEndModelReset" type="button">重置</button>
+              </div>
+              </div>
+              <div class="model-subgroup">
+                <div class="model-subgroup-head">
+                  <strong>X+ 底部</strong>
+                  <span id="cyl1XpBaseModelStatus" class="model-status">加载中</span>
+                </div>
+              <label class="model-display-toggle">
+                <input id="cyl1XpBaseModelVisible" type="checkbox" checked />
+                <span>显示</span>
+              </label>
+              <div class="model-tuner-grid">
+                <label>X <input id="cyl1XpBaseModelX" type="number" step="10" value="0" /></label>
+                <label>Y <input id="cyl1XpBaseModelY" type="number" step="10" value="0" /></label>
+                <label>Z <input id="cyl1XpBaseModelZ" type="number" step="10" value="0" /></label>
+                <label>RX <input id="cyl1XpBaseModelRx" type="number" step="1" value="0" /></label>
+                <label>RY <input id="cyl1XpBaseModelRy" type="number" step="1" value="0" /></label>
+                <label>RZ <input id="cyl1XpBaseModelRz" type="number" step="1" value="0" /></label>
+                <label>Scale <input id="cyl1XpBaseModelScale" type="number" step="0.01" value="1" /></label>
+                <button id="cyl1XpBaseModelReset" type="button">重置</button>
+              </div>
+              </div>
+              <div class="model-subgroup">
+                <div class="model-subgroup-head">
+                  <strong>X+ 端部</strong>
+                  <span id="cyl1XpEndModelStatus" class="model-status">加载中</span>
+                </div>
+              <label class="model-display-toggle">
+                <input id="cyl1XpEndModelVisible" type="checkbox" checked />
+                <span>显示</span>
+              </label>
+              <div class="model-tuner-grid">
+                <label>X <input id="cyl1XpEndModelX" type="number" step="10" value="0" /></label>
+                <label>Y <input id="cyl1XpEndModelY" type="number" step="10" value="0" /></label>
+                <label>Z <input id="cyl1XpEndModelZ" type="number" step="10" value="0" /></label>
+                <label>RX <input id="cyl1XpEndModelRx" type="number" step="1" value="0" /></label>
+                <label>RY <input id="cyl1XpEndModelRy" type="number" step="1" value="0" /></label>
+                <label>RZ <input id="cyl1XpEndModelRz" type="number" step="1" value="0" /></label>
+                <label>Scale <input id="cyl1XpEndModelScale" type="number" step="0.01" value="1" /></label>
+                <button id="cyl1XpEndModelReset" type="button">重置</button>
+              </div>
+              </div>
+            </div>
+          </details>
+          <details class="model-tuner" aria-label="电缸2模型调姿">
+            <summary class="model-tuner-head">
+              <div>
+                <p class="eyebrow">CYL2 GLB</p>
+                <strong>电缸2</strong>
+              </div>
+              <span class="model-status">X-/X+ 底部与端部</span>
+            </summary>
+            <div class="model-tuner-body">
+              <div class="model-subgroup">
+                <div class="model-subgroup-head">
+                  <strong>X- 底部</strong>
+                  <span id="cyl2XnBaseModelStatus" class="model-status">加载中</span>
+                </div>
+                <label class="model-display-toggle">
+                  <input id="cyl2XnBaseModelVisible" type="checkbox" checked />
+                  <span>显示</span>
+                </label>
+                <div class="model-tuner-grid">
+                  <label>X <input id="cyl2XnBaseModelX" type="number" step="10" value="0" /></label>
+                  <label>Y <input id="cyl2XnBaseModelY" type="number" step="10" value="0" /></label>
+                  <label>Z <input id="cyl2XnBaseModelZ" type="number" step="10" value="0" /></label>
+                  <label>RX <input id="cyl2XnBaseModelRx" type="number" step="1" value="0" /></label>
+                  <label>RY <input id="cyl2XnBaseModelRy" type="number" step="1" value="0" /></label>
+                  <label>RZ <input id="cyl2XnBaseModelRz" type="number" step="1" value="0" /></label>
+                  <label>Scale <input id="cyl2XnBaseModelScale" type="number" step="0.01" value="1" /></label>
+                  <button id="cyl2XnBaseModelReset" type="button">重置</button>
+                </div>
+              </div>
+              <div class="model-subgroup">
+                <div class="model-subgroup-head">
+                  <strong>X- 端部</strong>
+                  <span id="cyl2XnEndModelStatus" class="model-status">加载中</span>
+                </div>
+                <label class="model-display-toggle">
+                  <input id="cyl2XnEndModelVisible" type="checkbox" checked />
+                  <span>显示</span>
+                </label>
+                <div class="model-tuner-grid">
+                  <label>X <input id="cyl2XnEndModelX" type="number" step="10" value="0" /></label>
+                  <label>Y <input id="cyl2XnEndModelY" type="number" step="10" value="0" /></label>
+                  <label>Z <input id="cyl2XnEndModelZ" type="number" step="10" value="0" /></label>
+                  <label>RX <input id="cyl2XnEndModelRx" type="number" step="1" value="0" /></label>
+                  <label>RY <input id="cyl2XnEndModelRy" type="number" step="1" value="0" /></label>
+                  <label>RZ <input id="cyl2XnEndModelRz" type="number" step="1" value="0" /></label>
+                  <label>Scale <input id="cyl2XnEndModelScale" type="number" step="0.01" value="1" /></label>
+                  <button id="cyl2XnEndModelReset" type="button">重置</button>
+                </div>
+              </div>
+              <div class="model-subgroup">
+                <div class="model-subgroup-head">
+                  <strong>X+ 底部</strong>
+                  <span id="cyl2XpBaseModelStatus" class="model-status">加载中</span>
+                </div>
+                <label class="model-display-toggle">
+                  <input id="cyl2XpBaseModelVisible" type="checkbox" checked />
+                  <span>显示</span>
+                </label>
+                <div class="model-tuner-grid">
+                  <label>X <input id="cyl2XpBaseModelX" type="number" step="10" value="0" /></label>
+                  <label>Y <input id="cyl2XpBaseModelY" type="number" step="10" value="0" /></label>
+                  <label>Z <input id="cyl2XpBaseModelZ" type="number" step="10" value="0" /></label>
+                  <label>RX <input id="cyl2XpBaseModelRx" type="number" step="1" value="0" /></label>
+                  <label>RY <input id="cyl2XpBaseModelRy" type="number" step="1" value="0" /></label>
+                  <label>RZ <input id="cyl2XpBaseModelRz" type="number" step="1" value="0" /></label>
+                  <label>Scale <input id="cyl2XpBaseModelScale" type="number" step="0.01" value="1" /></label>
+                  <button id="cyl2XpBaseModelReset" type="button">重置</button>
+                </div>
+              </div>
+              <div class="model-subgroup">
+                <div class="model-subgroup-head">
+                  <strong>X+ 端部</strong>
+                  <span id="cyl2XpEndModelStatus" class="model-status">加载中</span>
+                </div>
+                <label class="model-display-toggle">
+                  <input id="cyl2XpEndModelVisible" type="checkbox" checked />
+                  <span>显示</span>
+                </label>
+                <div class="model-tuner-grid">
+                  <label>X <input id="cyl2XpEndModelX" type="number" step="10" value="0" /></label>
+                  <label>Y <input id="cyl2XpEndModelY" type="number" step="10" value="0" /></label>
+                  <label>Z <input id="cyl2XpEndModelZ" type="number" step="10" value="0" /></label>
+                  <label>RX <input id="cyl2XpEndModelRx" type="number" step="1" value="0" /></label>
+                  <label>RY <input id="cyl2XpEndModelRy" type="number" step="1" value="0" /></label>
+                  <label>RZ <input id="cyl2XpEndModelRz" type="number" step="1" value="0" /></label>
+                  <label>Scale <input id="cyl2XpEndModelScale" type="number" step="0.01" value="1" /></label>
+                  <button id="cyl2XpEndModelReset" type="button">重置</button>
+                </div>
+              </div>
+            </div>
+          </details>
+          <details class="model-tuner" aria-label="电缸3模型调姿">
+            <summary class="model-tuner-head">
+              <div>
+                <p class="eyebrow">CYL3 GLB</p>
+                <strong>电缸3</strong>
+              </div>
+              <span class="model-status">中部底部与端部</span>
+            </summary>
+            <div class="model-tuner-body">
+              <div class="model-subgroup">
+                <div class="model-subgroup-head">
+                  <strong>中部底部</strong>
+                  <span id="cyl3MidBaseModelStatus" class="model-status">加载中</span>
+                </div>
+                <label class="model-display-toggle">
+                  <input id="cyl3MidBaseModelVisible" type="checkbox" checked />
+                  <span>显示</span>
+                </label>
+                <div class="model-tuner-grid">
+                  <label>X <input id="cyl3MidBaseModelX" type="number" step="10" value="0" /></label>
+                  <label>Y <input id="cyl3MidBaseModelY" type="number" step="10" value="0" /></label>
+                  <label>Z <input id="cyl3MidBaseModelZ" type="number" step="10" value="0" /></label>
+                  <label>RX <input id="cyl3MidBaseModelRx" type="number" step="1" value="0" /></label>
+                  <label>RY <input id="cyl3MidBaseModelRy" type="number" step="1" value="0" /></label>
+                  <label>RZ <input id="cyl3MidBaseModelRz" type="number" step="1" value="0" /></label>
+                  <label>Scale <input id="cyl3MidBaseModelScale" type="number" step="0.01" value="1" /></label>
+                  <button id="cyl3MidBaseModelReset" type="button">重置</button>
+                </div>
+              </div>
+              <div class="model-subgroup">
+                <div class="model-subgroup-head">
+                  <strong>中部端部</strong>
+                  <span id="cyl3MidEndModelStatus" class="model-status">加载中</span>
+                </div>
+                <label class="model-display-toggle">
+                  <input id="cyl3MidEndModelVisible" type="checkbox" checked />
+                  <span>显示</span>
+                </label>
+                <div class="model-tuner-grid">
+                  <label>X <input id="cyl3MidEndModelX" type="number" step="10" value="0" /></label>
+                  <label>Y <input id="cyl3MidEndModelY" type="number" step="10" value="0" /></label>
+                  <label>Z <input id="cyl3MidEndModelZ" type="number" step="10" value="0" /></label>
+                  <label>RX <input id="cyl3MidEndModelRx" type="number" step="1" value="0" /></label>
+                  <label>RY <input id="cyl3MidEndModelRy" type="number" step="1" value="0" /></label>
+                  <label>RZ <input id="cyl3MidEndModelRz" type="number" step="1" value="0" /></label>
+                  <label>Scale <input id="cyl3MidEndModelScale" type="number" step="0.01" value="1" /></label>
+                  <button id="cyl3MidEndModelReset" type="button">重置</button>
+                </div>
+              </div>
+            </div>
+          </details>
+          <details class="model-tuner" aria-label="连杆A模型调姿">
+            <summary class="model-tuner-head">
+              <div>
+                <p class="eyebrow">LINK A GLB</p>
+                <strong>连杆A</strong>
+              </div>
+              <span class="model-status">A-1 X-/X+ / A-2</span>
+            </summary>
+            <div class="model-tuner-body">
+              <div class="model-subgroup">
+                <div class="model-subgroup-head">
+                  <strong>A-1 X-</strong>
+                  <span id="linkA1XnModelStatus" class="model-status">加载中</span>
+                </div>
+                <label class="model-display-toggle">
+                  <input id="linkA1XnModelVisible" type="checkbox" checked />
+                  <span>显示</span>
+                </label>
+                <div class="model-tuner-grid">
+                  <label>X <input id="linkA1XnModelX" type="number" step="10" value="0" /></label>
+                  <label>Y <input id="linkA1XnModelY" type="number" step="10" value="0" /></label>
+                  <label>Z <input id="linkA1XnModelZ" type="number" step="10" value="0" /></label>
+                  <label>RX <input id="linkA1XnModelRx" type="number" step="1" value="0" /></label>
+                  <label>RY <input id="linkA1XnModelRy" type="number" step="1" value="0" /></label>
+                  <label>RZ <input id="linkA1XnModelRz" type="number" step="1" value="0" /></label>
+                  <label>Scale <input id="linkA1XnModelScale" type="number" step="0.01" value="1" /></label>
+                  <button id="linkA1XnModelReset" type="button">重置</button>
+                </div>
+              </div>
+              <div class="model-subgroup">
+                <div class="model-subgroup-head">
+                  <strong>A-1 X+</strong>
+                  <span id="linkA1XpModelStatus" class="model-status">加载中</span>
+                </div>
+                <label class="model-display-toggle">
+                  <input id="linkA1XpModelVisible" type="checkbox" checked />
+                  <span>显示</span>
+                </label>
+                <div class="model-tuner-grid">
+                  <label>X <input id="linkA1XpModelX" type="number" step="10" value="0" /></label>
+                  <label>Y <input id="linkA1XpModelY" type="number" step="10" value="0" /></label>
+                  <label>Z <input id="linkA1XpModelZ" type="number" step="10" value="0" /></label>
+                  <label>RX <input id="linkA1XpModelRx" type="number" step="1" value="0" /></label>
+                  <label>RY <input id="linkA1XpModelRy" type="number" step="1" value="0" /></label>
+                  <label>RZ <input id="linkA1XpModelRz" type="number" step="1" value="0" /></label>
+                  <label>Scale <input id="linkA1XpModelScale" type="number" step="0.01" value="1" /></label>
+                  <button id="linkA1XpModelReset" type="button">重置</button>
+                </div>
+              </div>
+              <div class="model-subgroup">
+                <div class="model-subgroup-head">
+                  <strong>A-2 中间</strong>
+                  <span id="linkA2MidModelStatus" class="model-status">加载中</span>
+                </div>
+                <label class="model-display-toggle">
+                  <input id="linkA2MidModelVisible" type="checkbox" checked />
+                  <span>显示</span>
+                </label>
+                <div class="model-tuner-grid">
+                  <label>X <input id="linkA2MidModelX" type="number" step="10" value="0" /></label>
+                  <label>Y <input id="linkA2MidModelY" type="number" step="10" value="0" /></label>
+                  <label>Z <input id="linkA2MidModelZ" type="number" step="10" value="0" /></label>
+                  <label>RX <input id="linkA2MidModelRx" type="number" step="1" value="0" /></label>
+                  <label>RY <input id="linkA2MidModelRy" type="number" step="1" value="0" /></label>
+                  <label>RZ <input id="linkA2MidModelRz" type="number" step="1" value="0" /></label>
+                  <label>Scale <input id="linkA2MidModelScale" type="number" step="0.01" value="1" /></label>
+                  <button id="linkA2MidModelReset" type="button">重置</button>
+                </div>
+              </div>
+            </div>
+          </details>
+          <details class="model-tuner" aria-label="连杆B模型调姿">
+            <summary class="model-tuner-head">
+              <div>
+                <p class="eyebrow">LINK B GLB</p>
+                <strong>连杆B</strong>
+              </div>
+              <span class="model-status">B-1 X+ / B-1 X- / B-2</span>
+            </summary>
+            <div class="model-tuner-body">
+              <div class="model-subgroup">
+                <div class="model-subgroup-head">
+                  <strong>B-1 X+</strong>
+                  <span id="linkB1XpModelStatus" class="model-status">加载中</span>
+                </div>
+                <label class="model-display-toggle">
+                  <input id="linkB1XpModelVisible" type="checkbox" checked />
+                  <span>显示</span>
+                </label>
+                <div class="model-tuner-grid">
+                  <label>X <input id="linkB1XpModelX" type="number" step="10" value="0" /></label>
+                  <label>Y <input id="linkB1XpModelY" type="number" step="10" value="0" /></label>
+                  <label>Z <input id="linkB1XpModelZ" type="number" step="10" value="0" /></label>
+                  <label>RX <input id="linkB1XpModelRx" type="number" step="1" value="0" /></label>
+                  <label>RY <input id="linkB1XpModelRy" type="number" step="1" value="0" /></label>
+                  <label>RZ <input id="linkB1XpModelRz" type="number" step="1" value="0" /></label>
+                  <label>Scale <input id="linkB1XpModelScale" type="number" step="0.01" value="1" /></label>
+                  <button id="linkB1XpModelReset" type="button">重置</button>
+                </div>
+              </div>
+              <div class="model-subgroup">
+                <div class="model-subgroup-head">
+                  <strong>B-1 X-</strong>
+                  <span id="linkB1XnModelStatus" class="model-status">加载中</span>
+                </div>
+                <label class="model-display-toggle">
+                  <input id="linkB1XnModelVisible" type="checkbox" checked />
+                  <span>显示</span>
+                </label>
+                <div class="model-tuner-grid">
+                  <label>X <input id="linkB1XnModelX" type="number" step="10" value="0" /></label>
+                  <label>Y <input id="linkB1XnModelY" type="number" step="10" value="0" /></label>
+                  <label>Z <input id="linkB1XnModelZ" type="number" step="10" value="0" /></label>
+                  <label>RX <input id="linkB1XnModelRx" type="number" step="1" value="0" /></label>
+                  <label>RY <input id="linkB1XnModelRy" type="number" step="1" value="0" /></label>
+                  <label>RZ <input id="linkB1XnModelRz" type="number" step="1" value="0" /></label>
+                  <label>Scale <input id="linkB1XnModelScale" type="number" step="0.01" value="1" /></label>
+                  <button id="linkB1XnModelReset" type="button">重置</button>
+                </div>
+              </div>
+              <div class="model-subgroup">
+                <div class="model-subgroup-head">
+                  <strong>B-2 中间</strong>
+                  <span id="linkB2MidModelStatus" class="model-status">加载中</span>
+                </div>
+                <label class="model-display-toggle">
+                  <input id="linkB2MidModelVisible" type="checkbox" checked />
+                  <span>显示</span>
+                </label>
+                <div class="model-tuner-grid">
+                  <label>X <input id="linkB2MidModelX" type="number" step="10" value="0" /></label>
+                  <label>Y <input id="linkB2MidModelY" type="number" step="10" value="0" /></label>
+                  <label>Z <input id="linkB2MidModelZ" type="number" step="10" value="0" /></label>
+                  <label>RX <input id="linkB2MidModelRx" type="number" step="1" value="0" /></label>
+                  <label>RY <input id="linkB2MidModelRy" type="number" step="1" value="0" /></label>
+                  <label>RZ <input id="linkB2MidModelRz" type="number" step="1" value="0" /></label>
+                  <label>Scale <input id="linkB2MidModelScale" type="number" step="0.01" value="1" /></label>
+                  <button id="linkB2MidModelReset" type="button">重置</button>
+                </div>
+              </div>
+            </div>
+          </details>
+        </section>
+
+        <section class="metric-block">
+          <p class="eyebrow">ANGLES</p>
+          <div class="metric-list" id="metrics"></div>
+        </section>
+
+        <section class="logic-block">
+          <p class="eyebrow">LOGIC</p>
+          <div class="logic-row">
+            <span>臂角累加</span>
+            <strong id="totalArmAngle">-90°</strong>
+          </div>
+          <div class="logic-row">
+            <span>打印头姿态</span>
+            <strong id="couplerAngle">-90°</strong>
+          </div>
+          <div class="logic-row">
+            <span>整体旋转</span>
+            <strong id="baseAngle">180°</strong>
+          </div>
+          <div class="logic-row" hidden>
+            <span>Base_link旋转中心</span>
+            <strong id="baseLinkPivotReadout">118.258 / 0 / 0 mm</strong>
+          </div>
+        </section>
+
+        <section class="part-list">
+          <p class="eyebrow">AXIS DISTANCE</p>
+          <div class="part-row"><span>臂1 轴距</span><b id="arm1Length">-</b></div>
+          <div class="part-row"><span>臂2 轴距</span><b id="arm2Length">-</b></div>
+          <div class="part-row"><span>臂3 轴距</span><b id="arm3Length">-</b></div>
+          <div class="part-row"><span>打印头中心线</span><b id="toolLength">-</b></div>
+          <div class="part-row"><span>三节合计</span><b id="totalAxisLength">-</b></div>
+        </section>
+
+        <section class="part-list">
+          <p class="eyebrow">ACTUATOR STATE</p>
+          <div class="part-row"><span>臂1电缸</span><b id="arm1Actuator">-</b></div>
+          <div class="part-row"><span>臂2电缸</span><b id="arm2Actuator">-</b></div>
+          <div class="part-row"><span>臂3电缸</span><b id="arm3Actuator">-</b></div>
+        </section>
+
+        <section class="part-list">
+          <p class="eyebrow">LINKAGE STATE</p>
+          <div class="part-row"><span>连接杆A：A-1 / A-2</span><b id="linkAReadout">-</b></div>
+          <div class="part-row"><span>连接杆B：B-1 / B-2</span><b id="linkBReadout">-</b></div>
+        </section>
+
+        <section class="part-list" hidden>
+          <p class="eyebrow">AXIS JOINTS X/Y/Z</p>
+          <div class="part-row long"><span>轴心</span><b id="jointReadout">-</b></div>
+        </section>
+
+        <section class="part-list">
+          <p class="eyebrow">BLOCK STREAM</p>
+          <div class="part-row"><span>Block Instance</span><b>9</b></div>
+          <div class="part-row"><span>Rotate 3D</span><b>8</b></div>
+          <div class="part-row"><span>Point</span><b>5</b></div>
+          <div class="part-row"><span>Explode Tree</span><b>6</b></div>
+        </section>
+      </aside>
+    </main>
+    <script>
+      window.__lingzhuBootErrors = [];
+      window.addEventListener("error", (event) => {
+        window.__lingzhuBootErrors.push(event.message || String(event.error || "unknown error"));
+      });
+      window.addEventListener("unhandledrejection", (event) => {
+        window.__lingzhuBootErrors.push(event.reason?.message || String(event.reason || "unknown rejection"));
+      });
+    </script>
+    <script>
+      const bootScript = document.createElement("script");
+      bootScript.src = "./app-bundle.js?v=20260702-qt-hybrid-stage";
+      document.currentScript.after(bootScript);
+    </script>
+  </body>
+</html>
