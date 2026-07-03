@@ -48,20 +48,22 @@ assert.ok(solved.actuatorViolation <= EPS, `inverse actuator violation must be n
 const displayTip = worldDisplayedToolPointForState(solved.state, { x: 0, y: 262, z: 0 });
 assert.ok(Number.isFinite(displayTip.x) && Number.isFinite(displayTip.y) && Number.isFinite(displayTip.z));
 
-const arm2MaxSourceState = stateFromActuatorStrokes({ arm2: 1 }, DEFAULT_STATE);
-const arm2MaxTarget = worldDisplayedToolPointForState(arm2MaxSourceState, { x: 0, y: 262, z: 0 });
-const arm2PreferredSolved = solveStateForWorldDisplayedToolTarget(arm2MaxTarget, DEFAULT_STATE, { x: 0, y: 262, z: 0 });
-const arm2PreferredTip = worldDisplayedToolPointForState(arm2PreferredSolved.state, { x: 0, y: 262, z: 0 });
-const arm2PreferredError = Math.hypot(
-  arm2PreferredTip.x - arm2MaxTarget.x,
-  arm2PreferredTip.y - arm2MaxTarget.y,
-  arm2PreferredTip.z - arm2MaxTarget.z,
+const synchronizedSourceState = stateFromActuatorStrokes({ arm1: 0.75, arm2: 0.75, arm3: 0.75 }, DEFAULT_STATE);
+const synchronizedTarget = worldDisplayedToolPointForState(synchronizedSourceState, { x: 0, y: 262, z: 0 });
+const synchronizedSolved = solveStateForWorldDisplayedToolTarget(synchronizedTarget, DEFAULT_STATE, { x: 0, y: 262, z: 0 });
+const synchronizedTip = worldDisplayedToolPointForState(synchronizedSolved.state, { x: 0, y: 262, z: 0 });
+const synchronizedError = Math.hypot(
+  synchronizedTip.x - synchronizedTarget.x,
+  synchronizedTip.y - synchronizedTarget.y,
+  synchronizedTip.z - synchronizedTarget.z,
 );
-assert.ok(arm2PreferredError <= 5, `arm2 preferred inverse target error must stay low, got ${arm2PreferredError}`);
+const synchronizedStrokes = Object.values(synchronizedSolved.pose.actuators).map((actuator) => actuator.stroke);
+const synchronizedSpread = Math.max(...synchronizedStrokes) - Math.min(...synchronizedStrokes);
+assert.ok(synchronizedError <= 5, `synchronized inverse target error must stay low, got ${synchronizedError}`);
 assert.ok(
-  arm2PreferredSolved.pose.actuators.arm2.stroke >= 0.95,
-  `inverse solution should prefer high arm2 stroke, got ${arm2PreferredSolved.pose.actuators.arm2.stroke}`,
+  synchronizedSpread <= 0.12,
+  `inverse solution should keep actuator strokes nearly synchronized, got spread ${synchronizedSpread}`,
 );
-assert.ok(arm2PreferredSolved.actuatorViolation <= EPS, "arm2 preferred inverse solution must remain within stroke limits");
+assert.ok(synchronizedSolved.actuatorViolation <= EPS, "synchronized inverse solution must remain within stroke limits");
 
 console.log("Actuator constraint verification passed.");
