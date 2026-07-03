@@ -1,5 +1,15 @@
 work/node_modules/
 dist/
+docs/
+work/
+inputs/
+linkA_rate_analysis.csv
+linkA_second_rate_analysis.csv
+outputs/*
+!outputs/index.html
+!outputs/html-version/
+!outputs/html-version/**
+outputs/html-version/*.command
 outputs/sps_qt_gui/build/
 outputs/sps_qt_gui/runtime/
 outputs/sps_qt_gui/dist/
