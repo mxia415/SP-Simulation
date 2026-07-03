@@ -57,8 +57,8 @@ const ARM2_ACTUATOR_SIDE_OFFSET_MM = 195.5;
 
 export const ACTUATOR_STROKE_LIMITS = {
   arm1: { minLength: 1286.6, strokeLength: 900, label: "电缸1" },
-  arm2: { minLength: 1177.9, strokeLength: 710, label: "电缸2" },
-  arm3: { minLength: 1405.8, strokeLength: 580, label: "电缸3" },
+  arm2: { minLength: 1177.9, strokeLength: 680, label: "电缸2" },
+  arm3: { minLength: 1405.8, strokeLength: 520, label: "电缸3" },
 };
 
 Object.values(ACTUATOR_STROKE_LIMITS).forEach((limit) => {

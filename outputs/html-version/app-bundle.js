@@ -26380,8 +26380,8 @@ void main() {
   var ARM2_ACTUATOR_SIDE_OFFSET_MM = 195.5;
   var ACTUATOR_STROKE_LIMITS = {
     arm1: { minLength: 1286.6, strokeLength: 900, label: "\u7535\u7F381" },
-    arm2: { minLength: 1177.9, strokeLength: 710, label: "\u7535\u7F382" },
-    arm3: { minLength: 1405.8, strokeLength: 580, label: "\u7535\u7F383" }
+    arm2: { minLength: 1177.9, strokeLength: 680, label: "\u7535\u7F382" },
+    arm3: { minLength: 1405.8, strokeLength: 520, label: "\u7535\u7F383" }
   };
   Object.values(ACTUATOR_STROKE_LIMITS).forEach((limit) => {
     limit.maxLength = Number((limit.minLength + limit.strokeLength).toFixed(3));

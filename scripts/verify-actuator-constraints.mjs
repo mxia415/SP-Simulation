@@ -9,6 +9,7 @@ import {
 } from "../outputs/html-version/model.mjs";
 
 const EPS = 0.25;
+const EXPECTED_STROKE_LENGTHS = { arm1: 900, arm2: 680, arm3: 520 };
 
 function actuatorLength(state, key) {
   return computePose(state).actuators[key].instances[0].length;
@@ -20,6 +21,7 @@ function assertNear(actual, expected, label, epsilon = EPS) {
 
 for (const key of ["arm1", "arm2", "arm3"]) {
   const limits = ACTUATOR_STROKE_LIMITS[key];
+  assert.equal(limits.strokeLength, EXPECTED_STROKE_LENGTHS[key], `${key} stroke length`);
   assert.equal(limits.maxLength, limits.minLength + limits.strokeLength);
   const minState = stateFromActuatorStrokes({ [key]: 0 }, DEFAULT_STATE);
   const minLength = actuatorLength(minState, key);
