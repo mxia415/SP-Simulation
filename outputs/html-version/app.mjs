@@ -2,8 +2,12 @@ import * as THREE from "three";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
 import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
 import { MeshoptDecoder } from "three/addons/libs/meshopt_decoder.module.js";
+import { Line2 } from "three/addons/lines/Line2.js";
+import { LineGeometry } from "three/addons/lines/LineGeometry.js";
+import { LineMaterial } from "three/addons/lines/LineMaterial.js";
 import {
   ACTUATOR_GROUPS,
+  ACTUATOR_STROKE_LIMITS,
   DEFAULT_STATE,
   JOINTS,
   LIMITS,
@@ -19,8 +23,14 @@ import {
   stateFromActuatorStrokes,
   worldDisplayedToolPointForState,
 } from "./model.mjs";
+import {
+  COORDINATE_SYSTEM_NOTE,
+  DEVICE_SCENE_ROTATION_Y_RAD,
+  deviceToSceneVectorData,
+  sceneToDevicePointData,
+} from "./coordinates.mjs";
 
-const SCRIPT_VERSION = "20260702-qt-hybrid-stage";
+const SCRIPT_VERSION = "20260703-path-progress";
 const RENDER_SCALE = 1 / 1000;
 const QT_STAGE_MODE = new URLSearchParams(window.location.search).has("qtStage");
 if (QT_STAGE_MODE) document.documentElement.dataset.qtStage = "true";
@@ -28,6 +38,11 @@ const DEFAULT_CAMERA_POSITION = new THREE.Vector3(9.5, 7.2, 11.6);
 const DEFAULT_CAMERA_TARGET = new THREE.Vector3(0.8, 2.2, 0);
 const BASE_LINK_PIVOT_MM = { x: 118.258, y: 0, z: 0 };
 const TOOL_BALL_STICK_OFFSET_MM = { x: 0, y: 262, z: 0 };
+const IMPORTED_PATH_LINE_WIDTH_PX = 5;
+const IMPORTED_REMAINING_PATH_LINE_WIDTH_PX = 2;
+const IMPORTED_REMAINING_PATH_OPACITY = 0.05;
+const DEFAULT_IMPORTED_PATH_URL = "assets/paths/cuboid-4000x2700x3300-layer20-y3600-viewXYZ.csv";
+const DEFAULT_IMPORTED_PATH_NAME = "cuboid-4000x2700x3300-layer20-y3600-viewXYZ.csv";
 const SHOW_BALL_STICK_BASE = false;
 const SHOW_ARM1_ANCHOR_GUIDE = false;
 const ARM1_MODEL_REFERENCE_STATE = { visible: true, x: -3050, y: -135, z: -1590, rx: 0, ry: 0, rz: -90, scale: 1, unitScale: 1 };
@@ -45,16 +60,16 @@ const LINK_A2_MID_MODEL_REFERENCE_STATE = { visible: true, x: -3050, y: -135, z:
 const LINK_B1_XP_MODEL_REFERENCE_STATE = { visible: true, x: -3050, y: -135, z: -1590, rx: 0, ry: 0, rz: -90, scale: 1, unitScale: 1 };
 const LINK_B1_XN_MODEL_REFERENCE_STATE = { visible: true, x: -3050, y: -135, z: -1590, rx: 0, ry: 0, rz: -90, scale: 1, unitScale: 1 };
 const LINK_B2_MID_MODEL_REFERENCE_STATE = { visible: true, x: -3050, y: -135, z: -1590, rx: 0, ry: 0, rz: -90, scale: 1, unitScale: 1 };
-const DEVICE_AXIS_X = new THREE.Vector3(1, 0, 0);
-const DEVICE_AXIS_Y = new THREE.Vector3(0, 0, 1);
-const DEVICE_AXIS_Z = new THREE.Vector3(0, 1, 0);
+const SCENE_AXIS_FOR_DEVICE_X = new THREE.Vector3(1, 0, 0);
+const SCENE_AXIS_FOR_DEVICE_Y = new THREE.Vector3(0, 0, 1);
+const SCENE_AXIS_FOR_DEVICE_Z = new THREE.Vector3(0, 1, 0);
 const controlKeys = ["arm1", "arm2", "arm3", "offset", "base"];
 const strokeKeys = ["arm1", "arm2", "arm3"];
 const state = { ...DEFAULT_STATE };
 let driveMode = "angle";
 let currentPose = computePose(state);
 let modelEffect = QT_STAGE_MODE ? "transparent" : "solid";
-let actuatorBallStickOnly = false;
+let actuatorBallStickOnly = true;
 let keepToolVertical = true;
 let hasFramedInitialModel = false;
 const arm1ReferencePose = computePose(DEFAULT_STATE);
@@ -236,38 +251,41 @@ orbit.target.copy(DEFAULT_CAMERA_TARGET);
 orbit.minDistance = 4;
 orbit.maxDistance = 24;
 
+const deviceSceneRoot = new THREE.Group();
+deviceSceneRoot.rotation.y = DEVICE_SCENE_ROTATION_Y_RAD;
+scene.add(deviceSceneRoot);
+
 const root = new THREE.Group();
-scene.add(root);
+deviceSceneRoot.add(root);
 
 const fixedModelRoot = new THREE.Group();
-scene.add(fixedModelRoot);
+deviceSceneRoot.add(fixedModelRoot);
 
 const modelRoot = new THREE.Group();
 root.add(modelRoot);
 
 const ballStickMotionRoot = new THREE.Group();
-scene.add(ballStickMotionRoot);
+deviceSceneRoot.add(ballStickMotionRoot);
 
 const ballStickRoot = new THREE.Group();
 ballStickMotionRoot.add(ballStickRoot);
 
 const pathRoot = new THREE.Group();
-scene.add(pathRoot);
+deviceSceneRoot.add(pathRoot);
 
 const arm1AnchorGuideRoot = new THREE.Group();
-scene.add(arm1AnchorGuideRoot);
+deviceSceneRoot.add(arm1AnchorGuideRoot);
 
 const grid = new THREE.GridHelper(11, 11, 0x444444, 0x1d1d1d);
 grid.position.y = -1.2;
-scene.add(grid);
+deviceSceneRoot.add(grid);
 
 const staticGuideRoot = new THREE.Group();
-staticGuideRoot.rotation.y = Math.PI / 2;
-scene.add(staticGuideRoot);
+deviceSceneRoot.add(staticGuideRoot);
 createWorldGuides();
 
 const pivotGuideRoot = new THREE.Group();
-scene.add(pivotGuideRoot);
+deviceSceneRoot.add(pivotGuideRoot);
 createBaseLinkPivotGuide();
 pivotGuideRoot.visible = false;
 
@@ -298,6 +316,24 @@ const materials = {
   base: new THREE.MeshStandardMaterial({ color: 0x2b3138, roughness: 0.5, metalness: 0.3 }),
   linearHandle: new THREE.MeshBasicMaterial({ color: 0x4f8cff, transparent: true, opacity: 0.96, depthTest: false }),
   path: new THREE.LineBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.85 }),
+  walkedPath: new LineMaterial({
+    color: 0xffffff,
+    transparent: true,
+    opacity: 1,
+    linewidth: IMPORTED_PATH_LINE_WIDTH_PX,
+    depthWrite: false,
+  }),
+  remainingPath: new LineMaterial({
+    color: 0xffffff,
+    transparent: true,
+    opacity: IMPORTED_REMAINING_PATH_OPACITY,
+    linewidth: IMPORTED_REMAINING_PATH_LINE_WIDTH_PX,
+    dashed: true,
+    dashSize: 0.12,
+    gapSize: 0.09,
+    depthWrite: false,
+  }),
+  importedPathPoint: new THREE.MeshBasicMaterial({ color: 0x9ee8ff, transparent: true, opacity: 0.92, depthTest: false }),
 };
 
 const glbMaterials = {
@@ -360,6 +396,10 @@ const linearMotion = {
   startWorld: null,
   endWorld: null,
   startState: null,
+  pathPoints: null,
+  pathMode: "interpolated",
+  pathSourceName: "",
+  pathStatus: "未导入路径文件",
   progress: 0,
   speed: 500,
   animationFrame: null,
@@ -381,6 +421,7 @@ const pointerNdc = new THREE.Vector2();
 const linearDragPlane = new THREE.Plane();
 const linearDragIntersection = new THREE.Vector3();
 let linearDragHandle = null;
+let pathRenderStats = { walkedSegments: 0, remainingSegments: 0, mode: "none" };
 
 const modelControllers = {
   base: makeModelController(
@@ -799,9 +840,9 @@ function transformedByBaseRotation(localPoint, basePivot, baseQuaternion) {
 }
 
 function ballStickWorldPoint(point, pose) {
-  const basePivot = toThree(BASE_LINK_PIVOT_MM);
-  const baseQuaternion = deviceAxisQuaternion(DEVICE_AXIS_Z, degToRad(pose.baseAngle));
-  return transformedByBaseRotation(toThree(point), basePivot, baseQuaternion);
+  const basePivot = deviceToScene(BASE_LINK_PIVOT_MM);
+  const baseQuaternion = deviceAxisQuaternion(SCENE_AXIS_FOR_DEVICE_Z, degToRad(pose.baseAngle));
+  return transformedByBaseRotation(deviceToScene(point), basePivot, baseQuaternion);
 }
 
 function getActuatorInstance(pose, groupKey, side) {
@@ -845,8 +886,8 @@ function linkageSideDirectionWorld(instance, pose, side, anchorKey) {
 function frameQuaternionFromAxisAndSide(axis, sideHint) {
   const xAxis = axis.clone().normalize();
   let zAxis = sideHint.clone().sub(xAxis.clone().multiplyScalar(sideHint.dot(xAxis)));
-  if (zAxis.lengthSq() < 1e-10) zAxis = DEVICE_AXIS_Z.clone().sub(xAxis.clone().multiplyScalar(DEVICE_AXIS_Z.dot(xAxis)));
-  if (zAxis.lengthSq() < 1e-10) zAxis = DEVICE_AXIS_X.clone().sub(xAxis.clone().multiplyScalar(DEVICE_AXIS_X.dot(xAxis)));
+  if (zAxis.lengthSq() < 1e-10) zAxis = SCENE_AXIS_FOR_DEVICE_Z.clone().sub(xAxis.clone().multiplyScalar(SCENE_AXIS_FOR_DEVICE_Z.dot(xAxis)));
+  if (zAxis.lengthSq() < 1e-10) zAxis = SCENE_AXIS_FOR_DEVICE_X.clone().sub(xAxis.clone().multiplyScalar(SCENE_AXIS_FOR_DEVICE_X.dot(xAxis)));
   zAxis.normalize();
   const yAxis = zAxis.clone().cross(xAxis).normalize();
   zAxis = xAxis.clone().cross(yAxis).normalize();
@@ -884,19 +925,19 @@ function applyActuatorFollow(controller, pose, baseQuaternion, modelQuaternion, 
   controller.model.scale.setScalar(scale);
   controller.model.updateWorldMatrix(true, true);
 
-  const actualAnchorWorld = controller.model.localToWorld(anchorLocalPointForWorld(controller, scale));
+  const actualAnchorWorld = objectLocalToDeviceScene(controller.model, anchorLocalPointForWorld(controller, scale));
   const correction = targetWorld.clone().sub(actualAnchorWorld);
   controller.model.position.add(correction);
   controller.model.updateWorldMatrix(true, true);
-  controller.lastAnchorCorrectionWorld = toWorld(correction);
-  controller.lastModelAnchorWorld = toWorld(controller.model.localToWorld(anchorLocalPointForWorld(controller, scale)));
-  controller.lastTargetAnchorWorld = toWorld(targetWorld);
+  controller.lastAnchorCorrectionWorld = deviceSceneToDevice(correction);
+  controller.lastModelAnchorWorld = deviceSceneToDevice(objectLocalToDeviceScene(controller.model, anchorLocalPointForWorld(controller, scale)));
+  controller.lastTargetAnchorWorld = deviceSceneToDevice(targetWorld);
   controller.lastActuatorFollow = {
     group: follow.group,
     side: follow.side,
     point: follow.point,
-    tailWorld: toWorld(currentTail),
-    frontWorld: toWorld(currentFront),
+    tailWorld: deviceSceneToDevice(currentTail),
+    frontWorld: deviceSceneToDevice(currentFront),
   };
   return true;
 }
@@ -931,21 +972,21 @@ function applyLinkageFollow(controller, pose, modelQuaternion, scale) {
     controller.model.scale.setScalar(scale);
     controller.model.updateWorldMatrix(true, true);
 
-    const actualStartWorld = controller.model.localToWorld(controller.twoPointAnchors.start.clone());
-    const actualEndWorld = controller.model.localToWorld(controller.twoPointAnchors.end.clone());
+    const actualStartWorld = objectLocalToDeviceScene(controller.model, controller.twoPointAnchors.start.clone());
+    const actualEndWorld = objectLocalToDeviceScene(controller.model, controller.twoPointAnchors.end.clone());
     controller.lastAnchorCorrectionWorld = { x: 0, y: 0, z: 0 };
-    controller.lastModelAnchorWorld = toWorld(actualStartWorld);
-    controller.lastTargetAnchorWorld = toWorld(currentStart);
+    controller.lastModelAnchorWorld = deviceSceneToDevice(actualStartWorld);
+    controller.lastTargetAnchorWorld = deviceSceneToDevice(currentStart);
     controller.lastLinkageFollow = {
       group: follow.group,
       side: follow.side,
       start: startKey,
       end: endKey,
       point: pointKey,
-      startWorld: toWorld(currentStart),
-      endWorld: toWorld(currentEnd),
-      actualStartWorld: toWorld(actualStartWorld),
-      actualEndWorld: toWorld(actualEndWorld),
+      startWorld: deviceSceneToDevice(currentStart),
+      endWorld: deviceSceneToDevice(currentEnd),
+      actualStartWorld: deviceSceneToDevice(actualStartWorld),
+      actualEndWorld: deviceSceneToDevice(actualEndWorld),
       startError: Number(actualStartWorld.distanceTo(currentStart).toFixed(6)),
       endError: Number(actualEndWorld.distanceTo(currentEnd).toFixed(6)),
       length: currentStart.distanceTo(currentEnd) / RENDER_SCALE,
@@ -972,21 +1013,21 @@ function applyLinkageFollow(controller, pose, modelQuaternion, scale) {
   controller.model.scale.setScalar(scale);
   controller.model.updateWorldMatrix(true, true);
 
-  const actualAnchorWorld = controller.model.localToWorld(anchorLocalPointForWorld(controller, scale));
+  const actualAnchorWorld = objectLocalToDeviceScene(controller.model, anchorLocalPointForWorld(controller, scale));
   const correction = targetWorld.clone().sub(actualAnchorWorld);
   controller.model.position.add(correction);
   controller.model.updateWorldMatrix(true, true);
-  controller.lastAnchorCorrectionWorld = toWorld(correction);
-  controller.lastModelAnchorWorld = toWorld(controller.model.localToWorld(anchorLocalPointForWorld(controller, scale)));
-  controller.lastTargetAnchorWorld = toWorld(targetWorld);
+  controller.lastAnchorCorrectionWorld = deviceSceneToDevice(correction);
+  controller.lastModelAnchorWorld = deviceSceneToDevice(objectLocalToDeviceScene(controller.model, anchorLocalPointForWorld(controller, scale)));
+  controller.lastTargetAnchorWorld = deviceSceneToDevice(targetWorld);
   controller.lastLinkageFollow = {
     group: follow.group,
     side: follow.side,
     start: startKey,
     end: endKey,
     point: pointKey,
-    startWorld: toWorld(currentStart),
-    endWorld: toWorld(currentEnd),
+    startWorld: deviceSceneToDevice(currentStart),
+    endWorld: deviceSceneToDevice(currentEnd),
     length: currentStart.distanceTo(currentEnd) / RENDER_SCALE,
   };
   return true;
@@ -1020,9 +1061,9 @@ function makeReferenceSceneAnchorFromScenePoint(modelState, scenePoint) {
 }
 
 function deviceRotationQuaternion(rx, ry, rz) {
-  const qx = new THREE.Quaternion().setFromAxisAngle(DEVICE_AXIS_X, degToRad(rx));
-  const qy = new THREE.Quaternion().setFromAxisAngle(DEVICE_AXIS_Y, degToRad(ry));
-  const qz = new THREE.Quaternion().setFromAxisAngle(DEVICE_AXIS_Z, degToRad(rz));
+  const qx = new THREE.Quaternion().setFromAxisAngle(SCENE_AXIS_FOR_DEVICE_X, degToRad(rx));
+  const qy = new THREE.Quaternion().setFromAxisAngle(SCENE_AXIS_FOR_DEVICE_Y, degToRad(ry));
+  const qz = new THREE.Quaternion().setFromAxisAngle(SCENE_AXIS_FOR_DEVICE_Z, degToRad(rz));
   return new THREE.Quaternion().multiply(qz).multiply(qy).multiply(qx);
 }
 
@@ -1050,8 +1091,9 @@ function rotateThreeOffsetInDisplayedYZ(offset, angleRadians) {
   );
 }
 
-function toThree(point) {
-  return new THREE.Vector3(point.x * RENDER_SCALE, point.z * RENDER_SCALE, (point.y || 0) * RENDER_SCALE);
+function deviceToScene(point) {
+  const vector = deviceToSceneVectorData(point, RENDER_SCALE);
+  return new THREE.Vector3(vector.x, vector.y, vector.z);
 }
 
 function offsetPoint(point, offset) {
@@ -1077,7 +1119,7 @@ function makeTwoPointAnchors(modelState, startWorld, endWorld) {
   const inverseModelQuaternion = modelQuaternion.clone().invert();
   const scale = Math.max(0.001, modelState.scale) * (modelState.unitScale ?? RENDER_SCALE);
   const toLocalAnchor = (worldPoint) =>
-    toThree(worldPoint)
+    deviceToScene(worldPoint)
       .sub(modelPosition)
       .applyQuaternion(inverseModelQuaternion)
       .multiplyScalar(1 / scale);
@@ -1088,14 +1130,24 @@ function makeTwoPointAnchors(modelState, startWorld, endWorld) {
 }
 
 function applyBallStickBaseRotation(baseAngle) {
-  const pivotPosition = toThree(BASE_LINK_PIVOT_MM);
+  const pivotPosition = deviceToScene(BASE_LINK_PIVOT_MM);
   ballStickMotionRoot.position.copy(pivotPosition);
   ballStickMotionRoot.rotation.y = degToRad(baseAngle);
   ballStickRoot.position.copy(pivotPosition).multiplyScalar(-1);
 }
 
-function toWorld(vector) {
-  return { x: vector.x / RENDER_SCALE, y: vector.z / RENDER_SCALE, z: vector.y / RENDER_SCALE };
+function sceneToDevice(vector) {
+  const deviceSceneVector = deviceSceneRoot.worldToLocal(vector.clone());
+  return sceneToDevicePointData(deviceSceneVector, RENDER_SCALE);
+}
+
+function deviceSceneToDevice(vector) {
+  return sceneToDevicePointData(vector, RENDER_SCALE);
+}
+
+function objectLocalToDeviceScene(object, localPoint) {
+  object.updateWorldMatrix(true, false);
+  return deviceSceneRoot.worldToLocal(object.localToWorld(localPoint.clone()));
 }
 
 function roundedWorldPoint(point) {
@@ -1121,14 +1173,14 @@ function applyToolVerticalConstraint() {
 
 function makeSphere(point, radius, material, parent = ballStickRoot) {
   const mesh = new THREE.Mesh(new THREE.SphereGeometry(radius, 28, 16), material);
-  mesh.position.copy(toThree(point));
+  mesh.position.copy(deviceToScene(point));
   parent.add(mesh);
   return mesh;
 }
 
 function makeRod(start, end, radius, material, parent = ballStickRoot) {
-  const startVector = toThree(start);
-  const endVector = toThree(end);
+  const startVector = deviceToScene(start);
+  const endVector = deviceToScene(end);
   const direction = endVector.clone().sub(startVector);
   const length = direction.length();
   const mesh = new THREE.Mesh(new THREE.CylinderGeometry(radius, radius, Math.max(length, 0.0001), 18), material);
@@ -1139,8 +1191,8 @@ function makeRod(start, end, radius, material, parent = ballStickRoot) {
 }
 
 function makeGuideRod(startPoint, endPoint, radius, material, parent = staticGuideRoot) {
-  const start = toThree(startPoint);
-  const end = toThree(endPoint);
+  const start = deviceToScene(startPoint);
+  const end = deviceToScene(endPoint);
   const direction = end.clone().sub(start);
   const length = direction.length();
   const mesh = new THREE.Mesh(new THREE.CylinderGeometry(radius, radius, Math.max(length, 0.0001), 18), material);
@@ -1171,8 +1223,8 @@ function makeTextSprite(text, position, color = 0xf7f5f0, scale = 1) {
 function axisArrow(start, end, color, label) {
   const group = new THREE.Group();
   const material = new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.95 });
-  const startVector = toThree(start);
-  const endVector = toThree(end);
+  const startVector = deviceToScene(start);
+  const endVector = deviceToScene(end);
   makeGuideRod(start, end, 0.026, material, group);
   const direction = endVector.clone().sub(startVector).normalize();
   const cone = new THREE.Mesh(new THREE.ConeGeometry(0.14, 0.42, 28), material);
@@ -1204,14 +1256,14 @@ function createWorldGuides() {
   staticGuideRoot.add(axisArrow({ x: 0, y: 0, z: 0 }, { x: 0, y: axisLength, z: 0 }, 0x70a7ff, "Y+"));
   staticGuideRoot.add(axisArrow({ x: 0, y: 0, z: 0 }, { x: 0, y: 0, z: axisLength }, 0x4bd3a5, "Z+"));
   staticGuideRoot.add(axisTicks());
-  staticGuideRoot.add(makeTextSprite("GL-3DPRT-SP-S", toThree({ x: -5200, y: 4900, z: 40 }), 0xf7f5f0, 1.25));
+  staticGuideRoot.add(makeTextSprite("GL-3DPRT-SP-S", deviceToScene({ x: -5200, y: 4900, z: 40 }), 0xf7f5f0, 1.25));
 }
 
 function createBaseLinkPivotGuide() {
   const pivotMaterial = new THREE.MeshBasicMaterial({ color: 0xffd43b, transparent: true, opacity: 0.98, depthTest: false });
   const crossMaterial = new THREE.MeshBasicMaterial({ color: 0xff4fd8, transparent: true, opacity: 0.88, depthTest: false });
   const ringMaterial = new THREE.MeshBasicMaterial({ color: 0xffd43b, transparent: true, opacity: 0.55, side: THREE.DoubleSide, depthTest: false });
-  const pivotPosition = toThree(BASE_LINK_PIVOT_MM);
+  const pivotPosition = deviceToScene(BASE_LINK_PIVOT_MM);
   const pivot = new THREE.Mesh(new THREE.SphereGeometry(0.13, 32, 18), pivotMaterial);
   pivot.position.copy(pivotPosition);
   pivot.renderOrder = 20;
@@ -1310,6 +1362,7 @@ function createControl(key) {
 
 function createStrokeControl(key) {
   const label = ACTUATOR_GROUPS[key].label;
+  const strokeLimit = ACTUATOR_STROKE_LIMITS[key];
   const wrapper = document.createElement("section");
   wrapper.className = "control";
   wrapper.innerHTML = `
@@ -1321,7 +1374,7 @@ function createStrokeControl(key) {
       <input id="${key}Stroke" type="range" min="0" max="100" step="1" value="0" />
       <input class="number-input" id="${key}StrokeNumber" type="number" min="0" max="100" step="1" value="0" aria-label="${label}" />
     </div>
-    <div class="minmax"><span>收回</span><span>伸出</span></div>
+    <div class="minmax"><span>${strokeLimit.minLength.toFixed(1)} mm</span><span>${strokeLimit.maxLength.toFixed(1)} mm</span></div>
   `;
   strokeRoot.appendChild(wrapper);
   const sync = (value) => {
@@ -1391,6 +1444,26 @@ function createLinearControls() {
       <label>预计时间 <output id="linearDurationEstimate">0.0 s</output></label>
       <label>求解误差 <output id="linearSolveError">0 mm</output></label>
     </div>
+    <div class="linear-import-panel">
+      <div class="linear-import-head">
+        <strong>路径导入</strong>
+        <label class="linear-file-button">
+          <span>CSV / JSON</span>
+          <input id="linearPathFile" type="file" accept=".csv,.json,text/csv,application/json" />
+        </label>
+      </div>
+      <p class="coordinate-note">${COORDINATE_SYSTEM_NOTE}</p>
+      <div class="linear-grid">
+        <label>路径模式
+          <select id="linearPathMode">
+            <option value="interpolated">折线插值</option>
+            <option value="points">路径点步进</option>
+          </select>
+        </label>
+        <label>模拟点数 <output id="linearPathPointCount">0</output></label>
+      </div>
+      <output id="linearPathStatus" class="linear-path-status">${linearMotion.pathStatus}</output>
+    </div>
     <div class="range-line">
       <input id="linearProgress" type="range" min="0" max="100" step="1" value="0" />
       <input class="number-input" id="linearProgressNumber" type="number" min="0" max="100" step="1" value="0" aria-label="线性进度" />
@@ -1398,6 +1471,7 @@ function createLinearControls() {
     <div class="linear-actions">
       <button id="setLinearStart" type="button">当前设为起点</button>
       <button id="setLinearEnd" type="button">当前设为终点</button>
+      <button id="clearLinearPath" type="button">清除导入路径</button>
       <button id="simulateLinearMotion" type="button">模拟</button>
     </div>
   `;
@@ -1419,10 +1493,17 @@ function createLinearControls() {
     event.target.value = linearMotion.speed;
     syncLinearReadouts();
   });
+  document.querySelector("#linearPathMode").addEventListener("change", (event) => {
+    stopLinearSimulation();
+    linearMotion.pathMode = event.target.value === "points" ? "points" : "interpolated";
+    runLinearMotion();
+  });
+  document.querySelector("#linearPathFile").addEventListener("change", onLinearPathFileSelected);
   document.querySelector("#linearProgress").addEventListener("input", (event) => setLinearProgress(event.target.value));
   document.querySelector("#linearProgressNumber").addEventListener("change", (event) => setLinearProgress(event.target.value));
   document.querySelector("#setLinearStart").addEventListener("click", () => setLinearPoint("startWorld", currentTipWorld()));
   document.querySelector("#setLinearEnd").addEventListener("click", () => setLinearPoint("endWorld", currentTipWorld()));
+  document.querySelector("#clearLinearPath").addEventListener("click", clearImportedLinearPath);
   document.querySelector("#simulateLinearMotion").addEventListener("click", startLinearSimulation);
   syncLinearReadouts();
 }
@@ -1431,8 +1512,86 @@ function currentTipWorld() {
   return roundedWorldPoint(worldDisplayedToolPointForState(state, TOOL_BALL_STICK_OFFSET_MM));
 }
 
+function verticalPoseState() {
+  return clampState(applyPreset("calibration", DEFAULT_STATE));
+}
+
+function verticalPoseToolWorld() {
+  return roundedWorldPoint(worldDisplayedToolPointForState(verticalPoseState(), TOOL_BALL_STICK_OFFSET_MM));
+}
+
+function importedLinearPathActive() {
+  return Array.isArray(linearMotion.pathPoints) && linearMotion.pathPoints.length >= 2;
+}
+
+function activeLinearPathPoints() {
+  if (importedLinearPathActive()) return linearMotion.pathPoints;
+  return [linearMotion.startWorld, linearMotion.endWorld].filter(Boolean);
+}
+
+function segmentDistance(a, b) {
+  return a && b ? distance(a, b) : 0;
+}
+
 function linearPathDistance() {
-  return distance(linearMotion.startWorld, linearMotion.endWorld);
+  return pathDistanceForPoints(activeLinearPathPoints());
+}
+
+function pathDistanceForPoints(points) {
+  let total = 0;
+  for (let index = 1; index < points.length; index += 1) {
+    total += segmentDistance(points[index - 1], points[index]);
+  }
+  return total;
+}
+
+function splitPathAtProgress(points, progress) {
+  if (points.length < 2) return { walked: points.slice(), remaining: [], walkedDistance: 0 };
+  const total = pathDistanceForPoints(points);
+  if (total < 0.001) return { walked: [points[0]], remaining: points.slice(), walkedDistance: 0 };
+  const targetDistance = total * clamp(progress / 100, 0, 1);
+  let remainingDistance = total * clamp(progress / 100, 0, 1);
+  let walkedDistance = 0;
+  const walked = [points[0]];
+  for (let index = 1; index < points.length; index += 1) {
+    const start = points[index - 1];
+    const end = points[index];
+    const length = segmentDistance(start, end);
+    if (remainingDistance >= length) {
+      walked.push(end);
+      remainingDistance -= length;
+      walkedDistance += length;
+      continue;
+    }
+    const localT = length < 0.001 ? 0 : clamp(remainingDistance / length, 0, 1);
+    const current = roundedWorldPoint({
+      x: start.x + (end.x - start.x) * localT,
+      y: start.y + (end.y - start.y) * localT,
+      z: start.z + (end.z - start.z) * localT,
+    });
+    if (segmentDistance(walked[walked.length - 1], current) > 0.001) walked.push(current);
+    walkedDistance += length * localT;
+    return { walked, remaining: [current, ...points.slice(index)], walkedDistance: Math.min(walkedDistance, targetDistance) };
+  }
+  return { walked, remaining: [points[points.length - 1]], walkedDistance: total };
+}
+
+function addPathLine(points, material, name, dashed = false) {
+  if (points.length < 2) return 0;
+  const vectors = points.map((point) => deviceToScene(point));
+  let line;
+  if (material.isLineMaterial) {
+    const geometry = new LineGeometry();
+    geometry.setPositions(vectors.flatMap((vector) => [vector.x, vector.y, vector.z]));
+    line = new Line2(geometry, material);
+  } else {
+    const geometry = new THREE.BufferGeometry().setFromPoints(vectors);
+    line = new THREE.Line(geometry, material);
+  }
+  line.name = name;
+  if (dashed) line.computeLineDistances();
+  pathRoot.add(line);
+  return points.length - 1;
 }
 
 function syncLinearPointInputs(kind) {
@@ -1453,30 +1612,194 @@ function syncLinearReadouts(error = 0) {
   document.querySelector("#linearDurationEstimate").value = `${(linearPathDistance() / linearMotion.speed).toFixed(1)} s`;
   document.querySelector("#linearSolveError").value = `${error.toFixed(1)} mm`;
   document.querySelector("#simulateLinearMotion").textContent = linearMotion.isSimulating ? "停止" : "模拟";
+  const modeSelect = document.querySelector("#linearPathMode");
+  if (modeSelect) modeSelect.value = linearMotion.pathMode;
+  const countOutput = document.querySelector("#linearPathPointCount");
+  if (countOutput) countOutput.value = importedLinearPathActive() ? String(linearMotion.pathPoints.length) : "0";
+  const statusOutput = document.querySelector("#linearPathStatus");
+  if (statusOutput) statusOutput.value = linearMotion.pathStatus;
   drawLinearPath();
 }
 
 function setLinearPoint(kind, point) {
+  if (importedLinearPathActive()) {
+    linearMotion.pathPoints = null;
+    linearMotion.pathSourceName = "";
+    linearMotion.pathStatus = "已切回手动起终点路径";
+  }
   linearMotion[kind] = roundedWorldPoint(point);
   if (kind === "startWorld") linearMotion.startState = { ...state };
   syncLinearPointInputs(kind);
   syncLinearReadouts();
 }
 
-function linearTargetFromProgress() {
-  const t = clamp(linearMotion.progress / 100, 0, 1);
-  return {
-    x: linearMotion.startWorld.x + (linearMotion.endWorld.x - linearMotion.startWorld.x) * t,
-    y: linearMotion.startWorld.y + (linearMotion.endWorld.y - linearMotion.startWorld.y) * t,
-    z: linearMotion.startWorld.z + (linearMotion.endWorld.z - linearMotion.startWorld.z) * t,
+function normalizePathPoint(rawPoint, index = 0) {
+  let point;
+  if (Array.isArray(rawPoint)) {
+    point = { x: rawPoint[0], y: rawPoint[1], z: rawPoint[2] };
+  } else if (rawPoint && typeof rawPoint === "object") {
+    point = {
+      x: rawPoint.x ?? rawPoint.X,
+      y: rawPoint.y ?? rawPoint.Y,
+      z: rawPoint.z ?? rawPoint.Z,
+    };
+  }
+  const normalized = {
+    x: Number(point?.x),
+    y: Number(point?.y),
+    z: Number(point?.z),
   };
+  if (!Number.isFinite(normalized.x) || !Number.isFinite(normalized.y) || !Number.isFinite(normalized.z)) {
+    throw new Error(`第 ${index + 1} 个路径点缺少有效 X/Y/Z`);
+  }
+  return roundedWorldPoint(normalized);
+}
+
+function parseJsonPathPoints(text) {
+  const payload = JSON.parse(text);
+  const rows = Array.isArray(payload) ? payload : payload.points ?? payload.path ?? payload.positions;
+  if (!Array.isArray(rows)) throw new Error("JSON 需要是点数组，或包含 points/path/positions 数组");
+  return rows.map((row, index) => normalizePathPoint(row, index));
+}
+
+function splitCsvLine(line) {
+  return line
+    .trim()
+    .split(/[,\t; ]+/)
+    .map((cell) => cell.trim())
+    .filter(Boolean);
+}
+
+function parseCsvPathPoints(text) {
+  const lines = text
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter((line) => line && !line.startsWith("#"));
+  if (!lines.length) return [];
+  const first = splitCsvLine(lines[0]);
+  const hasHeader = first.some((cell) => Number.isNaN(Number(cell)));
+  const header = hasHeader ? first.map((cell) => cell.toLowerCase()) : ["x", "y", "z"];
+  const xIndex = header.indexOf("x");
+  const yIndex = header.indexOf("y");
+  const zIndex = header.indexOf("z");
+  if (xIndex < 0 || yIndex < 0 || zIndex < 0) throw new Error("CSV 表头需要包含 x,y,z");
+  const dataLines = hasHeader ? lines.slice(1) : lines;
+  return dataLines.map((line, index) => {
+    const cells = splitCsvLine(line);
+    return normalizePathPoint({ x: cells[xIndex], y: cells[yIndex], z: cells[zIndex] }, index);
+  });
+}
+
+function uniqueAdjacentPathPoints(points) {
+  return points.filter((point, index) => index === 0 || segmentDistance(points[index - 1], point) > 0.001);
+}
+
+function applyImportedLinearPath(points, sourceName = "") {
+  const cleanPoints = uniqueAdjacentPathPoints(points);
+  if (cleanPoints.length < 2) throw new Error("路径至少需要 2 个不同点");
+  const simulationPoints = uniqueAdjacentPathPoints([verticalPoseToolWorld(), ...cleanPoints]);
+  stopLinearSimulation();
+  linearMotion.pathPoints = simulationPoints;
+  linearMotion.pathSourceName = sourceName;
+  linearMotion.pathStatus = `已导入 ${cleanPoints.length} 点，模拟路径 ${simulationPoints.length} 点${sourceName ? ` · ${sourceName}` : ""}`;
+  linearMotion.startWorld = roundedWorldPoint(simulationPoints[0]);
+  linearMotion.endWorld = roundedWorldPoint(simulationPoints[simulationPoints.length - 1]);
+  linearMotion.startState = verticalPoseState();
+  linearMotion.progress = 0;
+  syncLinearPointInputs("startWorld");
+  syncLinearPointInputs("endWorld");
+  runLinearMotion({ resetToStartState: true });
+}
+
+function parseLinearPathFile(file, text) {
+  const name = file?.name || "";
+  if (/\.json$/i.test(name) || /^\s*[\[{]/.test(text)) return parseJsonPathPoints(text);
+  return parseCsvPathPoints(text);
+}
+
+async function onLinearPathFileSelected(event) {
+  const file = event.target.files?.[0];
+  if (!file) return;
+  try {
+    const text = await file.text();
+    applyImportedLinearPath(parseLinearPathFile(file, text), file.name);
+  } catch (error) {
+    stopLinearSimulation();
+    linearMotion.pathStatus = `导入失败：${error?.message || error}`;
+    syncLinearReadouts();
+  } finally {
+    event.target.value = "";
+  }
+}
+
+async function loadDefaultImportedLinearPath() {
+  try {
+    setDriveMode("linear");
+    const response = await fetch(DEFAULT_IMPORTED_PATH_URL);
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    const text = await response.text();
+    applyImportedLinearPath(parseCsvPathPoints(text), DEFAULT_IMPORTED_PATH_NAME);
+  } catch (error) {
+    linearMotion.pathStatus = `默认路径导入失败：${error?.message || error}`;
+    syncLinearReadouts();
+  }
+}
+
+function clearImportedLinearPath() {
+  stopLinearSimulation();
+  linearMotion.pathPoints = null;
+  linearMotion.pathSourceName = "";
+  linearMotion.pathStatus = "未导入路径文件";
+  linearMotion.progress = 0;
+  syncLinearReadouts();
+  runLinearMotion();
+}
+
+function pointAtLinearProgress(points, progress) {
+  if (!points.length) return currentTipWorld();
+  if (points.length === 1) return roundedWorldPoint(points[0]);
+  const t = clamp(progress / 100, 0, 1);
+  if (linearMotion.pathMode === "points") {
+    const index = clamp(Math.round(t * (points.length - 1)), 0, points.length - 1);
+    return roundedWorldPoint(points[index]);
+  }
+  const total = linearPathDistance();
+  if (total < 0.001) return roundedWorldPoint(points[0]);
+  let remaining = total * t;
+  for (let index = 1; index < points.length; index += 1) {
+    const start = points[index - 1];
+    const end = points[index];
+    const length = segmentDistance(start, end);
+    if (remaining <= length || index === points.length - 1) {
+      const localT = length < 0.001 ? 0 : clamp(remaining / length, 0, 1);
+      return roundedWorldPoint({
+        x: start.x + (end.x - start.x) * localT,
+        y: start.y + (end.y - start.y) * localT,
+        z: start.z + (end.z - start.z) * localT,
+      });
+    }
+    remaining -= length;
+  }
+  return roundedWorldPoint(points[points.length - 1]);
+}
+
+function linearTargetFromProgress() {
+  return pointAtLinearProgress(activeLinearPathPoints(), linearMotion.progress);
 }
 
 function displayedLinearTargetFromProgress() {
   return linearTargetFromProgress();
 }
 
-function runLinearMotion() {
+function runLinearMotion({ resetToStartState = false } = {}) {
+  if (resetToStartState && linearMotion.startState) {
+    Object.assign(state, clampState(linearMotion.startState));
+  }
+  if (importedLinearPathActive() && linearMotion.startState && linearMotion.progress <= 0.001) {
+    Object.assign(state, clampState(linearMotion.startState));
+    update(0);
+    return;
+  }
   const solved = solveStateForWorldDisplayedToolTarget(linearTargetFromProgress(), state, TOOL_BALL_STICK_OFFSET_MM);
   Object.assign(state, solved.state);
   applyToolVerticalConstraint();
@@ -1486,7 +1809,7 @@ function runLinearMotion() {
 function setLinearProgress(value) {
   stopLinearSimulation();
   linearMotion.progress = clamp(Number(value), 0, 100);
-  runLinearMotion();
+  runLinearMotion({ resetToStartState: importedLinearPathActive() });
 }
 
 function stopLinearSimulation() {
@@ -1506,6 +1829,7 @@ function startLinearSimulation() {
   if (pathDistance < 0.001) return;
   if (linearMotion.startState) Object.assign(state, clampState(linearMotion.startState));
   linearMotion.progress = 0;
+  runLinearMotion();
   linearMotion.startedAt = performance.now();
   linearMotion.isSimulating = true;
   const durationMs = Math.max(1, (pathDistance / linearMotion.speed) * 1000);
@@ -1525,11 +1849,42 @@ function startLinearSimulation() {
 function drawLinearPath() {
   clearGroup(pathRoot);
   linearDragHandle = null;
-  if (!linearMotion.startWorld || !linearMotion.endWorld) return;
-  const geometry = new THREE.BufferGeometry().setFromPoints([toThree(linearMotion.startWorld), toThree(linearMotion.endWorld)]);
-  pathRoot.add(new THREE.Line(geometry, materials.path));
-  makeSphere(linearMotion.startWorld, 0.055, materials.joint, pathRoot);
-  makeSphere(linearMotion.endWorld, 0.055, materials.tool, pathRoot);
+  pathRenderStats = { walkedSegments: 0, remainingSegments: 0, mode: "none" };
+  const points = activeLinearPathPoints();
+  if (points.length < 2) return;
+  if (importedLinearPathActive()) {
+    const split = splitPathAtProgress(points, linearMotion.progress);
+    const remainingDashOffset = split.walkedDistance * RENDER_SCALE;
+    materials.remainingPath.dashOffset = remainingDashOffset;
+    pathRenderStats = {
+      walkedSegments: addPathLine(split.walked, materials.walkedPath, "walkedPath", false),
+      remainingSegments: addPathLine(split.remaining, materials.remainingPath, "remainingPath", true),
+      mode: "progress",
+      lineRenderer: "fat-line",
+      lineWidthPx: IMPORTED_PATH_LINE_WIDTH_PX,
+      remainingLineWidthPx: IMPORTED_REMAINING_PATH_LINE_WIDTH_PX,
+      remainingOpacity: IMPORTED_REMAINING_PATH_OPACITY,
+      remainingDashOffset,
+    };
+  } else {
+    pathRenderStats = {
+      walkedSegments: addPathLine(points, materials.path, "manualPath", false),
+      remainingSegments: 0,
+      mode: "manual",
+      lineRenderer: "thin-line",
+      lineWidthPx: 1,
+    };
+  }
+  if (importedLinearPathActive()) {
+    pathRenderStats.pointMarkers = 0;
+    return;
+  }
+  points.forEach((point, index) => {
+    makeSphere(point, index === 0 || index === points.length - 1 ? 0.055 : 0.032, materials.joint, pathRoot);
+  });
+  makeSphere(points[0], 0.06, materials.joint, pathRoot);
+  makeSphere(points[points.length - 1], 0.06, materials.tool, pathRoot);
+  pathRenderStats.pointMarkers = points.length + 2;
 }
 
 function updatePointerNdc(event) {
@@ -1541,11 +1896,11 @@ function updatePointerNdc(event) {
 function scenePointForDisplayedTool(point) {
   ballStickMotionRoot.updateWorldMatrix(true, true);
   ballStickRoot.updateWorldMatrix(true, true);
-  return ballStickRoot.localToWorld(toThree(point));
+  return ballStickRoot.localToWorld(deviceToScene(point));
 }
 
 function worldPointFromScene(scenePoint) {
-  return roundedWorldPoint(toWorld(scenePoint));
+  return roundedWorldPoint(sceneToDevice(scenePoint));
 }
 
 function updateTipDragHandle(pose) {
@@ -1572,6 +1927,11 @@ function linearPointFromDragEvent(event) {
 function setLinearDraggedTarget(worldPoint) {
   if (!linearMotion.startWorld) return;
   stopLinearSimulation();
+  if (importedLinearPathActive()) {
+    linearMotion.pathPoints = null;
+    linearMotion.pathSourceName = "";
+    linearMotion.pathStatus = "已切回拖拽终点路径";
+  }
   const targetWorld = roundedWorldPoint(worldPoint);
   const solved = solveStateForWorldDisplayedToolTarget(targetWorld, state, TOOL_BALL_STICK_OFFSET_MM);
   Object.assign(state, solved.state);
@@ -1715,7 +2075,10 @@ function updateMetrics(pose) {
   document.querySelector("#totalAxisLength").textContent = `${pose.totalAxisDistance.toFixed(3)} mm`;
   strokeKeys.forEach((key) => {
     const actuator = pose.actuators[key];
-    document.querySelector(`#${key}Actuator`).textContent = `${actuator.instances[0].length.toFixed(1)} mm · ${actuator.count} 根`;
+    const strokeText = `${Math.round(actuator.stroke * 100)}%`;
+    const stateText = actuator.withinStroke ? "" : " · 越界";
+    document.querySelector(`#${key}Actuator`).textContent =
+      `${actuator.instances[0].length.toFixed(1)} mm · ${strokeText} · ${actuator.count} 根${stateText}`;
   });
   document.querySelector("#jointReadout").textContent = pose.joints.map((joint) => formatPoint(joint, 1)).join(" | ");
   document.querySelector("#linkAReadout").textContent = `${pose.linkages.A.instances[0].link1Length.toFixed(1)} / ${pose.linkages.A.instances[0].link2Length.toFixed(1)} mm`;
@@ -1727,7 +2090,7 @@ function drawPose(pose) {
   applyBallStickBaseRotation(pose.baseAngle);
   if (!actuatorBallStickOnly && SHOW_BALL_STICK_BASE) {
     const base = new THREE.Mesh(new THREE.CylinderGeometry(0.46, 0.58, 0.22, 42), materials.base);
-    base.position.copy(toThree({ x: JOINTS.baseArm1.x, y: 0, z: 0 }));
+    base.position.copy(deviceToScene({ x: JOINTS.baseArm1.x, y: 0, z: 0 }));
     ballStickRoot.add(base);
   }
   if (!actuatorBallStickOnly) {
@@ -1960,7 +2323,7 @@ function applyControllerTransform(controller, pose) {
   const s = controller.state;
   controller.group.visible = s.visible;
   const basePosition = new THREE.Vector3(s.x * RENDER_SCALE, s.z * RENDER_SCALE, s.y * RENDER_SCALE);
-  const pivotPosition = toThree(controller.pivotPoint);
+  const pivotPosition = deviceToScene(controller.pivotPoint);
   const target = controller.pivot === "origin" ? controller.model : controller.group;
   controller.group.position.copy(controller.pivot === "origin" ? pivotPosition : new THREE.Vector3(0, 0, 0));
   controller.group.rotation.set(0, 0, 0);
@@ -1978,7 +2341,7 @@ function applyControllerTransform(controller, pose) {
       controller.group.rotation.y = angleDelta;
     } else {
       target.position.applyAxisAngle(new THREE.Vector3(0, 1, 0), angleDelta);
-      target.quaternion.premultiply(deviceAxisQuaternion(DEVICE_AXIS_Z, angleDelta));
+      target.quaternion.premultiply(deviceAxisQuaternion(SCENE_AXIS_FOR_DEVICE_Z, angleDelta));
     }
   }
   if (controller.actuatorFollow) {
@@ -1994,11 +2357,11 @@ function applyControllerTransform(controller, pose) {
     const anchor = follows === "tool" ? segment.start : segment.start;
     if (controller.referencePoseFollow) {
       const baseAngleDelta = degToRad(pose.baseAngle - DEFAULT_STATE.base);
-      const baseQuaternion = deviceAxisQuaternion(DEVICE_AXIS_Z, baseAngleDelta);
+      const baseQuaternion = deviceAxisQuaternion(SCENE_AXIS_FOR_DEVICE_Z, baseAngleDelta);
       const modelQuaternion = deviceRotationQuaternion(s.rx, s.ry, s.rz);
       const referenceAngle = controller.followReferenceAngle ?? DEFAULT_STATE[follows] ?? 0;
       const angleDelta = degToRad((segment.angle - referenceAngle) * controller.jointRotationSign);
-      const localQuaternion = deviceAxisQuaternion(DEVICE_AXIS_Y, angleDelta).multiply(modelQuaternion);
+      const localQuaternion = deviceAxisQuaternion(SCENE_AXIS_FOR_DEVICE_Y, angleDelta).multiply(modelQuaternion);
       const finalQuaternion = baseQuaternion.clone().multiply(localQuaternion);
       const targetWorld = ballStickWorldPoint(anchor, pose);
       const rootOffset = anchorOffsetVector(controller, finalQuaternion, scale);
@@ -2009,20 +2372,20 @@ function applyControllerTransform(controller, pose) {
       controller.model.quaternion.copy(finalQuaternion);
       controller.model.scale.setScalar(scale);
       controller.model.updateWorldMatrix(true, true);
-      const actualAnchorWorld = controller.model.localToWorld(anchorLocalPointForWorld(controller, scale));
+      const actualAnchorWorld = objectLocalToDeviceScene(controller.model, anchorLocalPointForWorld(controller, scale));
       const correction = targetWorld.clone().sub(actualAnchorWorld);
       controller.model.position.add(correction);
       controller.model.updateWorldMatrix(true, true);
-      controller.lastAnchorCorrectionWorld = toWorld(correction);
-      controller.lastModelAnchorWorld = toWorld(controller.model.localToWorld(anchorLocalPointForWorld(controller, scale)));
-      controller.lastTargetAnchorWorld = toWorld(targetWorld);
+      controller.lastAnchorCorrectionWorld = deviceSceneToDevice(correction);
+      controller.lastModelAnchorWorld = deviceSceneToDevice(objectLocalToDeviceScene(controller.model, anchorLocalPointForWorld(controller, scale)));
+      controller.lastTargetAnchorWorld = deviceSceneToDevice(targetWorld);
       return;
     }
     if (controller.twoPointAnchors && !controller.editAnchorsOnly) {
-      const basePivot = toThree(BASE_LINK_PIVOT_MM);
+      const basePivot = deviceToScene(BASE_LINK_PIVOT_MM);
       const baseAngleDelta = degToRad(pose.baseAngle - DEFAULT_STATE.base);
-      const startPosition = toThree(segment.start);
-      const endPosition = toThree(segment.end);
+      const startPosition = deviceToScene(segment.start);
+      const endPosition = deviceToScene(segment.end);
       const modelQuaternion = deviceRotationQuaternion(s.rx, s.ry, s.rz);
       const scale = Math.max(0.001, s.scale) * (s.unitScale ?? RENDER_SCALE);
       const localStart = controller.twoPointAnchors.start.clone();
@@ -2033,7 +2396,7 @@ function applyControllerTransform(controller, pose) {
       const finalQuaternion = alignQuaternion.multiply(modelQuaternion);
       const startOffset = localStart.multiplyScalar(scale).applyQuaternion(finalQuaternion);
       controller.group.position.copy(basePivot);
-      controller.group.quaternion.copy(deviceAxisQuaternion(DEVICE_AXIS_Z, baseAngleDelta));
+      controller.group.quaternion.copy(deviceAxisQuaternion(SCENE_AXIS_FOR_DEVICE_Z, baseAngleDelta));
       controller.group.scale.setScalar(1);
       controller.model.position.copy(startPosition.sub(basePivot).sub(startOffset));
       controller.model.quaternion.copy(finalQuaternion);
@@ -2046,7 +2409,7 @@ function applyControllerTransform(controller, pose) {
       const referenceOffset = basePosition.clone().sub(anchorPosition);
       const modelQuaternion = deviceRotationQuaternion(s.rx, s.ry, s.rz);
       controller.group.position.copy(anchorPosition);
-      controller.group.quaternion.copy(deviceAxisQuaternion(DEVICE_AXIS_Y, angleDelta));
+      controller.group.quaternion.copy(deviceAxisQuaternion(SCENE_AXIS_FOR_DEVICE_Y, angleDelta));
       controller.group.scale.setScalar(1);
       if (controller.anchorLocal) {
         const anchorOffset = anchorOffsetVector(controller, modelQuaternion, scale);
@@ -2058,7 +2421,7 @@ function applyControllerTransform(controller, pose) {
       controller.model.scale.setScalar(scale);
     } else {
       target.position.add(anchorPosition);
-      target.quaternion.premultiply(deviceAxisQuaternion(DEVICE_AXIS_Z, degToRad(segment.angle)));
+      target.quaternion.premultiply(deviceAxisQuaternion(SCENE_AXIS_FOR_DEVICE_Z, degToRad(segment.angle)));
     }
   }
 }
@@ -2120,8 +2483,8 @@ function updateArm1AnchorGuide() {
   }
   ballStickMotionRoot.updateWorldMatrix(true, true);
   ballStickRoot.updateWorldMatrix(true, true);
-  const start = ballStickRoot.localToWorld(toThree(segment.start));
-  const end = ballStickRoot.localToWorld(toThree(segment.end));
+  const start = objectLocalToDeviceScene(ballStickRoot, deviceToScene(segment.start));
+  const end = objectLocalToDeviceScene(ballStickRoot, deviceToScene(segment.end));
   arm1AnchorGuideRoot.visible = true;
   arm1AnchorGuide.start.position.copy(start);
   arm1AnchorGuide.end.position.copy(end);
@@ -2129,15 +2492,15 @@ function updateArm1AnchorGuide() {
   if (controller.anchorLocal) {
     controller.model.updateWorldMatrix(true, true);
     const scale = Math.max(0.001, controller.state.scale) * (controller.state.unitScale ?? RENDER_SCALE);
-    const modelAnchor = controller.model.localToWorld(anchorLocalPointForWorld(controller, scale));
+    const modelAnchor = objectLocalToDeviceScene(controller.model, anchorLocalPointForWorld(controller, scale));
     arm1AnchorGuide.modelAnchor.visible = true;
     arm1AnchorGuide.modelAnchor.position.copy(modelAnchor);
-    controller.lastModelAnchorWorld = toWorld(modelAnchor);
-    controller.lastTargetAnchorWorld = toWorld(start);
+    controller.lastModelAnchorWorld = deviceSceneToDevice(modelAnchor);
+    controller.lastTargetAnchorWorld = deviceSceneToDevice(start);
   } else {
     arm1AnchorGuide.modelAnchor.visible = false;
     controller.lastModelAnchorWorld = null;
-    controller.lastTargetAnchorWorld = toWorld(start);
+    controller.lastTargetAnchorWorld = deviceSceneToDevice(start);
   }
 }
 
@@ -2162,9 +2525,9 @@ function update(linearError = 0) {
   applyToolVerticalConstraint();
   currentPose = computePose(state);
   controlKeys.forEach((key) => setControlValue(key, currentPose[key]));
-  setStrokeValue("arm1", currentPose.arm1 / LIMITS.arm1.max);
-  setStrokeValue("arm2", 1 - currentPose.arm2 / LIMITS.arm2.max);
-  setStrokeValue("arm3", 1 - currentPose.arm3 / LIMITS.arm3.max);
+  setStrokeValue("arm1", currentPose.actuators.arm1.stroke);
+  setStrokeValue("arm2", currentPose.actuators.arm2.stroke);
+  setStrokeValue("arm3", currentPose.actuators.arm3.stroke);
   setStrokeBaseValue(currentPose.base);
   updateMetrics(currentPose);
   drawPose(currentPose);
@@ -2178,12 +2541,16 @@ function update(linearError = 0) {
     renderMode: "three-js",
     device: "GL-3DPRT-SP-S",
     scriptVersion: SCRIPT_VERSION,
+    coordinateSystem: COORDINATE_SYSTEM_NOTE,
+    deviceSceneRotationY: DEVICE_SCENE_ROTATION_Y_RAD,
     webglAvailable,
     modelEffect,
+    actuatorBallStickOnly,
     keepToolVertical,
     pose: currentPose,
     dynamicObjectCount: ballStickRoot.children.length,
     linearPathObjectCount: pathRoot.children.length,
+    pathRender: pathRenderStats,
     actuatorCount: Object.values(currentPose.actuators).reduce((sum, actuator) => sum + actuator.instances.length, 0),
     linkageCount: Object.values(currentPose.linkages).reduce(
       (sum, linkage) =>
@@ -2196,6 +2563,14 @@ function update(linearError = 0) {
       0,
     ),
     linearMotion: { ...linearMotion, animationFrame: Boolean(linearMotion.animationFrame) },
+    importedLinearPath: {
+      active: importedLinearPathActive(),
+      mode: linearMotion.pathMode,
+      sourceName: linearMotion.pathSourceName,
+      pointCount: linearMotion.pathPoints?.length || 0,
+      distance: linearPathDistance(),
+      status: linearMotion.pathStatus,
+    },
     tipDrag: {
       enabled: true,
       isDragging: linearDrag.active,
@@ -2242,6 +2617,9 @@ function update(linearError = 0) {
 function resize() {
   const rect = canvas.parentElement.getBoundingClientRect();
   renderer.setSize(rect.width, rect.height, false);
+  [materials.walkedPath, materials.remainingPath].forEach((material) => {
+    material.resolution.set(Math.max(1, rect.width), Math.max(1, rect.height));
+  });
   camera.aspect = rect.width / rect.height;
   camera.updateProjectionMatrix();
 }
@@ -2270,8 +2648,20 @@ window.__spsQtStage = {
     setDriveMode(mode);
   },
   setLinearPath(payload = {}) {
+    if (Array.isArray(payload.points)) {
+      try {
+        applyImportedLinearPath(payload.points.map((point, index) => normalizePathPoint(point, index)), payload.sourceName || "API");
+      } catch (error) {
+        linearMotion.pathStatus = `导入失败：${error?.message || error}`;
+      }
+    } else if (payload.clearPoints) {
+      linearMotion.pathPoints = null;
+      linearMotion.pathSourceName = "";
+      linearMotion.pathStatus = "未导入路径文件";
+    }
     if (payload.start) linearMotion.startWorld = roundedWorldPoint(payload.start);
     if (payload.end) linearMotion.endWorld = roundedWorldPoint(payload.end);
+    if (payload.mode) linearMotion.pathMode = payload.mode === "points" ? "points" : "interpolated";
     if (Number.isFinite(Number(payload.progress))) linearMotion.progress = clamp(Number(payload.progress), 0, 100);
     if (Number.isFinite(Number(payload.speed))) linearMotion.speed = Math.max(1, Number(payload.speed));
     syncLinearPointInputs("startWorld");
@@ -2396,4 +2786,5 @@ function animate() {
 
 resize();
 update();
+loadDefaultImportedLinearPath();
 animate();

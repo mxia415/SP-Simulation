@@ -297,6 +297,85 @@ input[type="checkbox"] {
   font-variant-numeric: tabular-nums;
 }
 
+.linear-grid output {
+  display: flex;
+  align-items: center;
+  min-height: 30px;
+  color: var(--text);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+
+.linear-import-panel {
+  display: grid;
+  gap: 8px;
+  padding: 10px;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  background: #000;
+}
+
+.linear-import-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.linear-import-head strong {
+  color: var(--text);
+  font-size: 12px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.linear-file-button {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 30px;
+  padding: 0 12px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  color: var(--amber);
+  background: #000;
+  font-size: 11px;
+  font-weight: 900;
+  cursor: pointer;
+}
+
+.linear-file-button:hover {
+  color: #000;
+  border-color: #fff;
+  background: #fff;
+}
+
+.linear-file-button input {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  opacity: 0;
+  cursor: pointer;
+}
+
+.linear-path-status {
+  min-height: 18px;
+  color: var(--muted);
+  font-size: 10px;
+  font-weight: 900;
+  line-height: 1.4;
+}
+
+.coordinate-note {
+  margin: 0;
+  color: var(--steel);
+  font-size: 10px;
+  font-weight: 900;
+  line-height: 1.45;
+}
+
 .linear-actions {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -639,6 +718,57 @@ input[type="checkbox"] {
   color: var(--text);
   background: #000;
   font-size: 12px;
+}
+
+.model-pose-controls {
+  display: block;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  background: #000;
+}
+
+.model-pose-controls-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: 48px;
+  padding: 10px;
+  cursor: pointer;
+  list-style: none;
+}
+
+.model-pose-controls-head::-webkit-details-marker {
+  display: none;
+}
+
+.model-pose-controls-head::after {
+  content: "+";
+  flex: 0 0 auto;
+  color: var(--amber);
+  font-size: 18px;
+  font-weight: 900;
+}
+
+.model-pose-controls[open] .model-pose-controls-head::after {
+  content: "-";
+}
+
+.model-pose-controls-head strong {
+  color: var(--text);
+  font-size: 13px;
+}
+
+.model-pose-controls-head > span {
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 900;
+}
+
+.model-pose-controls-body {
+  display: grid;
+  gap: 10px;
+  padding: 0 10px 10px;
 }
 
 .model-empty-state {

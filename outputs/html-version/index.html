@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>SP-S模拟</title>
     <link rel="icon" href="data:," />
-    <link rel="stylesheet" href="./styles.css?v=20260702-qt-hybrid-stage" />
+    <link rel="stylesheet" href="./styles.css?v=20260703-coordinate-unified" />
   </head>
   <body>
     <main class="shell">
@@ -14,7 +14,7 @@
           <div>
             <p class="eyebrow">GL-3DPRT-SP Simulation</p>
             <h1>SP-S模拟</h1>
-            <p class="version-line">V1.0 · 2026-07-02· ©Ming Xia</p>
+            <p class="version-line">V1.2 · 2026-07-03 · ©Ming Xia</p>
           </div>
         </header>
 
@@ -70,7 +70,7 @@
             <span>显示所有球棍模型</span>
           </label>
           <label class="model-display-toggle">
-            <input id="actuatorBallStickOnly" type="checkbox" />
+            <input id="actuatorBallStickOnly" type="checkbox" checked />
             <span>仅显示电缸球棍模型</span>
           </label>
           <label class="model-effect-control">
@@ -80,6 +80,15 @@
               <option value="solid" selected>浅色实体</option>
             </select>
           </label>
+          <details id="glbPoseControls" class="model-pose-controls">
+            <summary class="model-pose-controls-head">
+              <div>
+                <p class="eyebrow">GLB POSE</p>
+                <strong>GLB 姿态控制</strong>
+              </div>
+              <span>展开调参</span>
+            </summary>
+            <div class="model-pose-controls-body">
           <details class="model-tuner" aria-label="底座模型调姿">
             <summary class="model-tuner-head">
               <div>
@@ -605,6 +614,8 @@
               </div>
             </div>
           </details>
+            </div>
+          </details>
         </section>
 
         <section class="metric-block">
@@ -679,7 +690,7 @@
     </script>
     <script>
       const bootScript = document.createElement("script");
-      bootScript.src = "./app-bundle.js?v=20260702-qt-hybrid-stage";
+      bootScript.src = "./app-bundle.js?v=20260703-path-progress";
       document.currentScript.after(bootScript);
     </script>
   </body>

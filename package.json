@@ -4,6 +4,11 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "build": "node scripts/build-cloudflare-pages.mjs"
+    "build": "node scripts/build-cloudflare-pages.mjs",
+    "generate:path": "node scripts/generate-one-stroke-cuboid-path.mjs",
+    "verify:browser": "node scripts/verify-browser.mjs",
+    "verify:coordinates": "node scripts/verify-coordinate-system.mjs",
+    "verify:actuators": "node scripts/verify-actuator-constraints.mjs",
+    "verify:path": "node scripts/verify-one-stroke-path.mjs"
   }
 }

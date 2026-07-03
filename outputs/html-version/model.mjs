@@ -1,7 +1,7 @@
 export const LIMITS = {
-  arm1: { min: 0, max: 120, label: "臂1" },
-  arm2: { min: 0, max: 180, label: "臂2" },
-  arm3: { min: 0, max: 180, label: "臂3" },
+  arm1: { min: 0, max: 128, label: "臂1" },
+  arm2: { min: 5, max: 180, label: "臂2" },
+  arm3: { min: -10, max: 180, label: "臂3" },
   offset: { min: -270, max: 210, label: "打印头" },
   base: { min: -180, max: 180, label: "旋转" },
 };
@@ -54,6 +54,16 @@ export const TOTAL_AXIS_DISTANCE_MM = ARM_LENGTHS_MM.arm1 + ARM_LENGTHS_MM.arm2 
 const SIDE_OFFSET_MM = 230;
 const ARM1_ACTUATOR_SIDE_OFFSET_MM = 291;
 const ARM2_ACTUATOR_SIDE_OFFSET_MM = 195.5;
+
+export const ACTUATOR_STROKE_LIMITS = {
+  arm1: { minLength: 1286.6, strokeLength: 900, label: "电缸1" },
+  arm2: { minLength: 1177.9, strokeLength: 710, label: "电缸2" },
+  arm3: { minLength: 1405.8, strokeLength: 580, label: "电缸3" },
+};
+
+Object.values(ACTUATOR_STROKE_LIMITS).forEach((limit) => {
+  limit.maxLength = Number((limit.minLength + limit.strokeLength).toFixed(3));
+});
 
 export const ACTUATOR_GROUPS = {
   arm1: {
@@ -302,6 +312,34 @@ function makeActuatorInstances(group, center) {
   }));
 }
 
+function actuatorStrokeForLength(groupKey, length) {
+  const limits = ACTUATOR_STROKE_LIMITS[groupKey];
+  if (!limits) return { stroke: 0, violation: 0, withinStroke: true };
+  const stroke = (length - limits.minLength) / limits.strokeLength;
+  const under = Math.max(0, limits.minLength - length);
+  const over = Math.max(0, length - limits.maxLength);
+  return {
+    minLength: limits.minLength,
+    maxLength: limits.maxLength,
+    strokeLength: limits.strokeLength,
+    stroke: clamp(stroke, 0, 1),
+    rawStroke: stroke,
+    violation: under + over,
+    withinStroke: under + over <= 0.25,
+  };
+}
+
+function annotateActuatorGroup(groupKey, group, center) {
+  const instances = makeActuatorInstances(group, center);
+  const length = instances[0]?.length || 0;
+  return {
+    ...group,
+    center,
+    instances,
+    ...actuatorStrokeForLength(groupKey, length),
+  };
+}
+
 function computeActuators(pose, linkages = null) {
   const arm1Center = {
     tail: ACTUATOR_GROUPS.arm1.tail,
@@ -317,9 +355,9 @@ function computeActuators(pose, linkages = null) {
   };
 
   return {
-    arm1: { ...ACTUATOR_GROUPS.arm1, center: arm1Center, instances: makeActuatorInstances(ACTUATOR_GROUPS.arm1, arm1Center) },
-    arm2: { ...ACTUATOR_GROUPS.arm2, center: arm2Center, instances: makeActuatorInstances(ACTUATOR_GROUPS.arm2, arm2Center) },
-    arm3: { ...ACTUATOR_GROUPS.arm3, center: arm3Center, instances: makeActuatorInstances(ACTUATOR_GROUPS.arm3, arm3Center) },
+    arm1: annotateActuatorGroup("arm1", ACTUATOR_GROUPS.arm1, arm1Center),
+    arm2: annotateActuatorGroup("arm2", ACTUATOR_GROUPS.arm2, arm2Center),
+    arm3: annotateActuatorGroup("arm3", ACTUATOR_GROUPS.arm3, arm3Center),
   };
 }
 
@@ -450,13 +488,48 @@ export function angleFromActuatorStroke(mechanism, normalizedStroke) {
   return min + (max - min) * clamp(normalizedStroke, 0, 1);
 }
 
+function actuatorLengthForState(state, key) {
+  return computePose(state).actuators[key].instances[0].length;
+}
+
+function actuatorStrokeViolationForPose(pose) {
+  return Object.values(pose.actuators).reduce((sum, actuator) => sum + (actuator.violation || 0), 0);
+}
+
+function actuatorStrokeViolationForState(state) {
+  return actuatorStrokeViolationForPose(computePose(state));
+}
+
+function stateForActuatorStroke(key, normalizedStroke, currentState) {
+  const limits = ACTUATOR_STROKE_LIMITS[key];
+  if (!limits) return currentState;
+  const targetLength = limits.minLength + limits.strokeLength * clamp(normalizedStroke, 0, 1);
+  const angleLimit = LIMITS[key];
+  let bestState = clampState(currentState);
+  let bestScore = Infinity;
+  const evaluate = (angle) => {
+    const candidate = clampState({ ...currentState, [key]: angle });
+    const length = actuatorLengthForState(candidate, key);
+    const score = Math.abs(length - targetLength) + Math.abs(angleDistance(candidate[key], currentState[key])) * 0.001;
+    if (score < bestScore) {
+      bestScore = score;
+      bestState = candidate;
+    }
+  };
+  for (let angle = angleLimit.min; angle <= angleLimit.max; angle += 1) evaluate(angle);
+  const start = Math.max(angleLimit.min, bestState[key] - 1.5);
+  const end = Math.min(angleLimit.max, bestState[key] + 1.5);
+  for (let angle = start; angle <= end; angle += 0.02) evaluate(angle);
+  return bestState;
+}
+
 export function stateFromActuatorStrokes(strokes, currentState = DEFAULT_STATE) {
-  return clampState({
-    ...currentState,
-    arm1: strokes.arm1 == null ? currentState.arm1 : LIMITS.arm1.min + (LIMITS.arm1.max - LIMITS.arm1.min) * clamp(strokes.arm1, 0, 1),
-    arm2: strokes.arm2 == null ? currentState.arm2 : LIMITS.arm2.max - (LIMITS.arm2.max - LIMITS.arm2.min) * clamp(strokes.arm2, 0, 1),
-    arm3: strokes.arm3 == null ? currentState.arm3 : LIMITS.arm3.max - (LIMITS.arm3.max - LIMITS.arm3.min) * clamp(strokes.arm3, 0, 1),
+  let nextState = clampState(currentState);
+  ["arm1", "arm2", "arm3"].forEach((key) => {
+    if (strokes[key] == null) return;
+    nextState = stateForActuatorStroke(key, strokes[key], nextState);
   });
+  return clampState(nextState);
 }
 
 export function solveStateForToolTarget(targetWorld, currentState = DEFAULT_STATE) {
@@ -475,12 +548,13 @@ export function solveStateForToolTarget(targetWorld, currentState = DEFAULT_STAT
     const tip = computePose(state).toolCenter;
     const rotatedTip = rotateXYAround(tip, referenceBase - state.base);
     const distance = Math.hypot(rotatedTip.x - target.x, rotatedTip.y - target.y, rotatedTip.z - target.z);
+    const actuatorPenalty = actuatorStrokeViolationForState(state) * 1000;
     const continuity =
       Math.abs(angleDistance(state.arm1, currentState.arm1)) * 0.08 +
       Math.abs(angleDistance(state.arm2, currentState.arm2)) * 0.04 +
       Math.abs(angleDistance(state.arm3, currentState.arm3)) * 0.04 +
       Math.abs(angleDistance(state.base, currentState.base)) * 0.04;
-    return distance + continuity;
+    return distance + continuity + actuatorPenalty;
   };
 
   let bestScore = score(candidate);
@@ -508,6 +582,7 @@ export function solveStateForToolTarget(targetWorld, currentState = DEFAULT_STAT
     pose,
     target,
     error: score(candidate),
+    actuatorViolation: actuatorStrokeViolationForPose(pose),
     reachable: bestScore < 35,
   };
 }
@@ -527,12 +602,13 @@ export function solveStateForDisplayedToolTarget(targetWorld, currentState = DEF
     const displayTip = offsetPoint(computePose(state).toolCenter, displayOffset);
     const rotatedTip = rotateXYAround(displayTip, referenceBase - state.base);
     const distance = Math.hypot(rotatedTip.x - target.x, rotatedTip.y - target.y, rotatedTip.z - target.z);
+    const actuatorPenalty = actuatorStrokeViolationForState(state) * 1000;
     const continuity =
       Math.abs(angleDistance(state.arm1, currentState.arm1)) * 0.08 +
       Math.abs(angleDistance(state.arm2, currentState.arm2)) * 0.04 +
       Math.abs(angleDistance(state.arm3, currentState.arm3)) * 0.04 +
       Math.abs(angleDistance(state.base, currentState.base)) * 0.04;
-    return distance + continuity;
+    return distance + continuity + actuatorPenalty;
   };
 
   let bestScore = score(candidate);
@@ -560,6 +636,7 @@ export function solveStateForDisplayedToolTarget(targetWorld, currentState = DEF
     pose,
     target,
     error: score(candidate),
+    actuatorViolation: actuatorStrokeViolationForPose(pose),
     reachable: bestScore < 35,
   };
 }
@@ -584,12 +661,13 @@ export function solveStateForWorldDisplayedToolTarget(targetWorld, currentState 
   const score = (state) => {
     const displayTip = worldDisplayedToolPointForState(state, displayOffset);
     const distance = Math.hypot(displayTip.x - target.x, displayTip.y - target.y, displayTip.z - target.z);
+    const actuatorPenalty = actuatorStrokeViolationForState(state) * 1000;
     const continuity =
       Math.abs(angleDistance(state.arm1, currentState.arm1)) * 0.08 +
       Math.abs(angleDistance(state.arm2, currentState.arm2)) * 0.04 +
       Math.abs(angleDistance(state.arm3, currentState.arm3)) * 0.04 +
       Math.abs(angleDistance(state.base, currentState.base)) * 0.04;
-    return distance + continuity;
+    return distance + continuity + actuatorPenalty;
   };
 
   let bestScore = score(candidate);
@@ -617,6 +695,7 @@ export function solveStateForWorldDisplayedToolTarget(targetWorld, currentState 
     pose,
     target,
     error: score(candidate),
+    actuatorViolation: actuatorStrokeViolationForPose(pose),
     reachable: bestScore < 35,
   };
 }

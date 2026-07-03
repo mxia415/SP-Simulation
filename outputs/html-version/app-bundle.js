@@ -1,5 +1,10 @@
 (() => {
-  // node_modules/three/build/three.module.js
+  // work/node_modules/three/build/three.module.js
+  /**
+   * @license
+   * Copyright 2010-2024 Three.js Authors
+   * SPDX-License-Identifier: MIT
+   */
   var REVISION = "165";
   var MOUSE = { LEFT: 0, MIDDLE: 1, RIGHT: 2, ROTATE: 0, DOLLY: 1, PAN: 2 };
   var TOUCH = { ROTATE: 0, PAN: 1, DOLLY_PAN: 2, DOLLY_ROTATE: 3 };
@@ -13110,7 +13115,7 @@
   var fragment = "uniform sampler2D shadow_pass;\nuniform vec2 resolution;\nuniform float radius;\n#include <packing>\nvoid main() {\n	const float samples = float( VSM_SAMPLES );\n	float mean = 0.0;\n	float squared_mean = 0.0;\n	float uvStride = samples <= 1.0 ? 0.0 : 2.0 / ( samples - 1.0 );\n	float uvStart = samples <= 1.0 ? 0.0 : - 1.0;\n	for ( float i = 0.0; i < samples; i ++ ) {\n		float uvOffset = uvStart + i * uvStride;\n		#ifdef HORIZONTAL_PASS\n			vec2 distribution = unpackRGBATo2Half( texture2D( shadow_pass, ( gl_FragCoord.xy + vec2( uvOffset, 0.0 ) * radius ) / resolution ) );\n			mean += distribution.x;\n			squared_mean += distribution.y * distribution.y + distribution.x * distribution.x;\n		#else\n			float depth = unpackRGBAToDepth( texture2D( shadow_pass, ( gl_FragCoord.xy + vec2( 0.0, uvOffset ) * radius ) / resolution ) );\n			mean += depth;\n			squared_mean += depth * depth;\n		#endif\n	}\n	mean = mean / samples;\n	squared_mean = squared_mean / samples;\n	float std_dev = sqrt( squared_mean - mean * mean );\n	gl_FragColor = pack2HalfToRGBA( vec2( mean, std_dev ) );\n}";
   function WebGLShadowMap(renderer2, objects, capabilities) {
     let _frustum = new Frustum();
-    const _shadowMapSize = new Vector2(), _viewportSize = new Vector2(), _viewport = new Vector4(), _depthMaterial = new MeshDepthMaterial({ depthPacking: RGBADepthPacking }), _distanceMaterial = new MeshDistanceMaterial(), _materialCache = {}, _maxTextureSize = capabilities.maxTextureSize;
+    const _shadowMapSize = new Vector2(), _viewportSize = new Vector2(), _viewport2 = new Vector4(), _depthMaterial = new MeshDepthMaterial({ depthPacking: RGBADepthPacking }), _distanceMaterial = new MeshDistanceMaterial(), _materialCache = {}, _maxTextureSize = capabilities.maxTextureSize;
     const shadowSide = { [FrontSide]: BackSide, [BackSide]: FrontSide, [DoubleSide]: DoubleSide };
     const shadowMaterialVertical = new ShaderMaterial({
       defines: {
@@ -13193,13 +13198,13 @@
         const viewportCount = shadow.getViewportCount();
         for (let vp = 0; vp < viewportCount; vp++) {
           const viewport = shadow.getViewport(vp);
-          _viewport.set(
+          _viewport2.set(
             _viewportSize.x * viewport.x,
             _viewportSize.y * viewport.y,
             _viewportSize.x * viewport.z,
             _viewportSize.y * viewport.w
           );
-          _state.viewport(_viewport);
+          _state.viewport(_viewport2);
           shadow.updateMatrices(light, vp);
           _frustum = shadow.getFrustum();
           renderObject(scene2, camera2, shadow.camera, light, this.type);
@@ -16579,7 +16584,7 @@ void main() {
       let _pixelRatio = 1;
       let _opaqueSort = null;
       let _transparentSort = null;
-      const _viewport = new Vector4(0, 0, _width, _height);
+      const _viewport2 = new Vector4(0, 0, _width, _height);
       const _scissor = new Vector4(0, 0, _width, _height);
       let _scissorTest = false;
       const _frustum = new Frustum();
@@ -16724,15 +16729,15 @@ void main() {
         return target.copy(_currentViewport);
       };
       this.getViewport = function(target) {
-        return target.copy(_viewport);
+        return target.copy(_viewport2);
       };
       this.setViewport = function(x, y, width, height) {
         if (x.isVector4) {
-          _viewport.set(x.x, x.y, x.z, x.w);
+          _viewport2.set(x.x, x.y, x.z, x.w);
         } else {
-          _viewport.set(x, y, width, height);
+          _viewport2.set(x, y, width, height);
         }
-        state2.viewport(_currentViewport.copy(_viewport).multiplyScalar(_pixelRatio).round());
+        state2.viewport(_currentViewport.copy(_viewport2).multiplyScalar(_pixelRatio).round());
       };
       this.getScissor = function(target) {
         return target.copy(_scissor);
@@ -17675,7 +17680,7 @@ void main() {
           _currentScissor.copy(renderTarget.scissor);
           _currentScissorTest = renderTarget.scissorTest;
         } else {
-          _currentViewport.copy(_viewport).multiplyScalar(_pixelRatio).floor();
+          _currentViewport.copy(_viewport2).multiplyScalar(_pixelRatio).floor();
           _currentScissor.copy(_scissor).multiplyScalar(_pixelRatio).floor();
           _currentScissorTest = _scissorTest;
         }
@@ -19527,6 +19532,77 @@ void main() {
       return new _TorusGeometry(data.radius, data.tube, data.radialSegments, data.tubularSegments, data.arc);
     }
   };
+  var WireframeGeometry = class extends BufferGeometry {
+    constructor(geometry = null) {
+      super();
+      this.type = "WireframeGeometry";
+      this.parameters = {
+        geometry
+      };
+      if (geometry !== null) {
+        const vertices = [];
+        const edges = /* @__PURE__ */ new Set();
+        const start = new Vector3();
+        const end = new Vector3();
+        if (geometry.index !== null) {
+          const position = geometry.attributes.position;
+          const indices = geometry.index;
+          let groups = geometry.groups;
+          if (groups.length === 0) {
+            groups = [{ start: 0, count: indices.count, materialIndex: 0 }];
+          }
+          for (let o = 0, ol = groups.length; o < ol; ++o) {
+            const group = groups[o];
+            const groupStart = group.start;
+            const groupCount = group.count;
+            for (let i = groupStart, l = groupStart + groupCount; i < l; i += 3) {
+              for (let j = 0; j < 3; j++) {
+                const index1 = indices.getX(i + j);
+                const index2 = indices.getX(i + (j + 1) % 3);
+                start.fromBufferAttribute(position, index1);
+                end.fromBufferAttribute(position, index2);
+                if (isUniqueEdge(start, end, edges) === true) {
+                  vertices.push(start.x, start.y, start.z);
+                  vertices.push(end.x, end.y, end.z);
+                }
+              }
+            }
+          }
+        } else {
+          const position = geometry.attributes.position;
+          for (let i = 0, l = position.count / 3; i < l; i++) {
+            for (let j = 0; j < 3; j++) {
+              const index1 = 3 * i + j;
+              const index2 = 3 * i + (j + 1) % 3;
+              start.fromBufferAttribute(position, index1);
+              end.fromBufferAttribute(position, index2);
+              if (isUniqueEdge(start, end, edges) === true) {
+                vertices.push(start.x, start.y, start.z);
+                vertices.push(end.x, end.y, end.z);
+              }
+            }
+          }
+        }
+        this.setAttribute("position", new Float32BufferAttribute(vertices, 3));
+      }
+    }
+    copy(source) {
+      super.copy(source);
+      this.parameters = Object.assign({}, source.parameters);
+      return this;
+    }
+  };
+  function isUniqueEdge(start, end, edges) {
+    const hash1 = `${start.x},${start.y},${start.z}-${end.x},${end.y},${end.z}`;
+    const hash2 = `${end.x},${end.y},${end.z}-${start.x},${start.y},${start.z}`;
+    if (edges.has(hash1) === true || edges.has(hash2) === true) {
+      return false;
+    } else {
+      edges.add(hash1);
+      edges.add(hash2);
+      return true;
+    }
+  }
   var MeshStandardMaterial = class extends Material {
     constructor(parameters) {
       super();
@@ -21227,6 +21303,25 @@ void main() {
       return path + url;
     }
   };
+  var InstancedBufferGeometry = class extends BufferGeometry {
+    constructor() {
+      super();
+      this.isInstancedBufferGeometry = true;
+      this.type = "InstancedBufferGeometry";
+      this.instanceCount = Infinity;
+    }
+    copy(source) {
+      super.copy(source);
+      this.instanceCount = source.instanceCount;
+      return this;
+    }
+    toJSON() {
+      const data = super.toJSON();
+      data.instanceCount = this.instanceCount;
+      data.isInstancedBufferGeometry = true;
+      return data;
+    }
+  };
   var ImageBitmapLoader = class extends Loader {
     constructor(manager) {
       super(manager);
@@ -21666,6 +21761,29 @@ void main() {
     ]
   ];
   var _controlInterpolantsResultBuffer = new Float32Array(1);
+  var InstancedInterleavedBuffer = class extends InterleavedBuffer {
+    constructor(array, stride, meshPerAttribute = 1) {
+      super(array, stride);
+      this.isInstancedInterleavedBuffer = true;
+      this.meshPerAttribute = meshPerAttribute;
+    }
+    copy(source) {
+      super.copy(source);
+      this.meshPerAttribute = source.meshPerAttribute;
+      return this;
+    }
+    clone(data) {
+      const ib = super.clone(data);
+      ib.meshPerAttribute = this.meshPerAttribute;
+      return ib;
+    }
+    toJSON(data) {
+      const json = super.toJSON(data);
+      json.isInstancedInterleavedBuffer = true;
+      json.meshPerAttribute = this.meshPerAttribute;
+      return json;
+    }
+  };
   var _matrix = /* @__PURE__ */ new Matrix4();
   var Raycaster = class {
     constructor(origin, direction, near = 0, far = Infinity) {
@@ -21776,6 +21894,65 @@ void main() {
       return new this.constructor().copy(this);
     }
   };
+  var _startP = /* @__PURE__ */ new Vector3();
+  var _startEnd = /* @__PURE__ */ new Vector3();
+  var Line3 = class {
+    constructor(start = new Vector3(), end = new Vector3()) {
+      this.start = start;
+      this.end = end;
+    }
+    set(start, end) {
+      this.start.copy(start);
+      this.end.copy(end);
+      return this;
+    }
+    copy(line) {
+      this.start.copy(line.start);
+      this.end.copy(line.end);
+      return this;
+    }
+    getCenter(target) {
+      return target.addVectors(this.start, this.end).multiplyScalar(0.5);
+    }
+    delta(target) {
+      return target.subVectors(this.end, this.start);
+    }
+    distanceSq() {
+      return this.start.distanceToSquared(this.end);
+    }
+    distance() {
+      return this.start.distanceTo(this.end);
+    }
+    at(t, target) {
+      return this.delta(target).multiplyScalar(t).add(this.start);
+    }
+    closestPointToPointParameter(point, clampToLine) {
+      _startP.subVectors(point, this.start);
+      _startEnd.subVectors(this.end, this.start);
+      const startEnd2 = _startEnd.dot(_startEnd);
+      const startEnd_startP = _startEnd.dot(_startP);
+      let t = startEnd_startP / startEnd2;
+      if (clampToLine) {
+        t = clamp(t, 0, 1);
+      }
+      return t;
+    }
+    closestPointToPoint(point, clampToLine, target) {
+      const t = this.closestPointToPointParameter(point, clampToLine);
+      return this.delta(target).multiplyScalar(t).add(this.start);
+    }
+    applyMatrix4(matrix) {
+      this.start.applyMatrix4(matrix);
+      this.end.applyMatrix4(matrix);
+      return this;
+    }
+    equals(line) {
+      return line.start.equals(this.start) && line.end.equals(this.end);
+    }
+    clone() {
+      return new this.constructor().copy(this);
+    }
+  };
   var GridHelper = class extends LineSegments {
     constructor(size = 10, divisions = 10, color1 = 4473924, color2 = 8947848) {
       color1 = new Color(color1);
@@ -21822,7 +21999,7 @@ void main() {
     }
   }
 
-  // node_modules/three/examples/jsm/controls/OrbitControls.js
+  // work/node_modules/three/examples/jsm/controls/OrbitControls.js
   var _changeEvent = { type: "change" };
   var _startEvent = { type: "start" };
   var _endEvent = { type: "end" };
@@ -22596,7 +22773,7 @@ void main() {
     }
   };
 
-  // node_modules/three/examples/jsm/utils/BufferGeometryUtils.js
+  // work/node_modules/three/examples/jsm/utils/BufferGeometryUtils.js
   function toTrianglesDrawMode(geometry, drawMode) {
     if (drawMode === TrianglesDrawMode) {
       console.warn("THREE.BufferGeometryUtils.toTrianglesDrawMode(): Geometry already defined as triangles.");
@@ -22652,7 +22829,7 @@ void main() {
     }
   }
 
-  // node_modules/three/examples/jsm/loaders/GLTFLoader.js
+  // work/node_modules/three/examples/jsm/loaders/GLTFLoader.js
   var GLTFLoader = class extends Loader {
     constructor(manager) {
       super(manager);
@@ -25133,7 +25310,7 @@ void main() {
     });
   }
 
-  // node_modules/three/examples/jsm/libs/meshopt_decoder.module.js
+  // work/node_modules/three/examples/jsm/libs/meshopt_decoder.module.js
   var MeshoptDecoder = (function() {
     "use strict";
     var wasm_base = "b9H79Tebbbe8Fv9Gbb9Gvuuuuueu9Giuuub9Geueu9Giuuueuikqbeeedddillviebeoweuec:q;iekr;leDo9TW9T9VV95dbH9F9F939H79T9F9J9H229F9Jt9VV7bb8A9TW79O9V9Wt9F9KW9J9V9KW9wWVtW949c919M9MWVbeY9TW79O9V9Wt9F9KW9J9V9KW69U9KW949c919M9MWVbdE9TW79O9V9Wt9F9KW9J9V9KW69U9KW949tWG91W9U9JWbiL9TW79O9V9Wt9F9KW9J9V9KWS9P2tWV9p9JtblK9TW79O9V9Wt9F9KW9J9V9KWS9P2tWV9r919HtbvL9TW79O9V9Wt9F9KW9J9V9KWS9P2tWVT949Wbol79IV9Rbrq:P8Yqdbk;3sezu8Jjjjjbcj;eb9Rgv8Kjjjjbc9:hodnadcefal0mbcuhoaiRbbc:Ge9hmbavaialfgrad9Radz1jjjbhwcj;abad9UhoaicefhldnadTmbaoc;WFbGgocjdaocjd6EhDcbhqinaqae9pmeaDaeaq9RaqaDfae6Egkcsfgocl4cifcd4hxdndndndnaoc9WGgmTmbcbhPcehsawcjdfhzalhHinaraH9Rax6midnaraHaxfgl9RcK6mbczhoinawcj;cbfaogifgoc9WfhOdndndndndnaHaic9WfgAco4fRbbaAci4coG4ciGPlbedibkaO9cb83ibaOcwf9cb83ibxikaOalRblalRbbgAco4gCaCciSgCE86bbaocGfalclfaCfgORbbaAcl4ciGgCaCciSgCE86bbaocVfaOaCfgORbbaAcd4ciGgCaCciSgCE86bbaoc7faOaCfgORbbaAciGgAaAciSgAE86bbaoctfaOaAfgARbbalRbegOco4gCaCciSgCE86bbaoc91faAaCfgARbbaOcl4ciGgCaCciSgCE86bbaoc4faAaCfgARbbaOcd4ciGgCaCciSgCE86bbaoc93faAaCfgARbbaOciGgOaOciSgOE86bbaoc94faAaOfgARbbalRbdgOco4gCaCciSgCE86bbaoc95faAaCfgARbbaOcl4ciGgCaCciSgCE86bbaoc96faAaCfgARbbaOcd4ciGgCaCciSgCE86bbaoc97faAaCfgARbbaOciGgOaOciSgOE86bbaoc98faAaOfgORbbalRbiglco4gAaAciSgAE86bbaoc99faOaAfgORbbalcl4ciGgAaAciSgAE86bbaoc9:faOaAfgORbbalcd4ciGgAaAciSgAE86bbaocufaOaAfgoRbbalciGglalciSglE86bbaoalfhlxdkaOalRbwalRbbgAcl4gCaCcsSgCE86bbaocGfalcwfaCfgORbbaAcsGgAaAcsSgAE86bbaocVfaOaAfgORbbalRbegAcl4gCaCcsSgCE86bbaoc7faOaCfgORbbaAcsGgAaAcsSgAE86bbaoctfaOaAfgORbbalRbdgAcl4gCaCcsSgCE86bbaoc91faOaCfgORbbaAcsGgAaAcsSgAE86bbaoc4faOaAfgORbbalRbigAcl4gCaCcsSgCE86bbaoc93faOaCfgORbbaAcsGgAaAcsSgAE86bbaoc94faOaAfgORbbalRblgAcl4gCaCcsSgCE86bbaoc95faOaCfgORbbaAcsGgAaAcsSgAE86bbaoc96faOaAfgORbbalRbvgAcl4gCaCcsSgCE86bbaoc97faOaCfgORbbaAcsGgAaAcsSgAE86bbaoc98faOaAfgORbbalRbogAcl4gCaCcsSgCE86bbaoc99faOaCfgORbbaAcsGgAaAcsSgAE86bbaoc9:faOaAfgORbbalRbrglcl4gAaAcsSgAE86bbaocufaOaAfgoRbbalcsGglalcsSglE86bbaoalfhlxekaOal8Pbb83bbaOcwfalcwf8Pbb83bbalczfhlkdnaiam9pmbaiczfhoaral9RcL0mekkaiam6mialTmidnakTmbawaPfRbbhOcbhoazhiinaiawcj;cbfaofRbbgAce4cbaAceG9R7aOfgO86bbaiadfhiaocefgoak9hmbkkazcefhzaPcefgPad6hsalhHaPad9hmexvkkcbhlasceGmdxikalaxad2fhCdnakTmbcbhHcehsawcjdfhminaral9Rax6mialTmdalaxfhlawaHfRbbhOcbhoamhiinaiawcj;cbfaofRbbgAce4cbaAceG9R7aOfgO86bbaiadfhiaocefgoak9hmbkamcefhmaHcefgHad6hsaHad9hmbkaChlxikcbhocehsinaral9Rax6mdalTmealaxfhlaocefgoad6hsadao9hmbkaChlxdkcbhlasceGTmekc9:hoxikabaqad2fawcjdfakad2z1jjjb8Aawawcjdfakcufad2fadz1jjjb8Aakaqfhqalmbkc9:hoxekcbc99aral9Radcaadca0ESEhokavcj;ebf8Kjjjjbaok;yzeHu8Jjjjjbc;ae9Rgv8Kjjjjbc9:hodnaeci9UgrcHfal0mbcuhoaiRbbgwc;WeGc;Ge9hmbawcsGgDce0mbavc;abfcFecjez:jjjjb8AavcUf9cu83ibavc8Wf9cu83ibavcyf9cu83ibavcaf9cu83ibavcKf9cu83ibavczf9cu83ibav9cu83iwav9cu83ibaialfc9WfhqaicefgwarfhodnaeTmbcmcsaDceSEhkcbhxcbhmcbhDcbhicbhlindnaoaq9nmbc9:hoxikdndnawRbbgrc;Ve0mbavc;abfalarcl4cu7fcsGcitfgPydlhsaPydbhzdnarcsGgPak9pmbavaiarcu7fcsGcdtfydbaxaPEhraPThPdndnadcd9hmbabaDcetfgHaz87ebaHcdfas87ebaHclfar87ebxekabaDcdtfgHazBdbaHclfasBdbaHcwfarBdbkaxaPfhxavc;abfalcitfgHarBdbaHasBdlavaicdtfarBdbavc;abfalcefcsGglcitfgHazBdbaHarBdlaiaPfhialcefhlxdkdndnaPcsSmbamaPfaPc987fcefhmxekaocefhrao8SbbgPcFeGhHdndnaPcu9mmbarhoxekaocvfhoaHcFbGhHcrhPdninar8SbbgOcFbGaPtaHVhHaOcu9kmearcefhraPcrfgPc8J9hmbxdkkarcefhokaHce4cbaHceG9R7amfhmkdndnadcd9hmbabaDcetfgraz87ebarcdfas87ebarclfam87ebxekabaDcdtfgrazBdbarclfasBdbarcwfamBdbkavc;abfalcitfgramBdbarasBdlavaicdtfamBdbavc;abfalcefcsGglcitfgrazBdbaramBdlaicefhialcefhlxekdnarcpe0mbaxcefgOavaiaqarcsGfRbbgPcl49RcsGcdtfydbaPcz6gHEhravaiaP9RcsGcdtfydbaOaHfgsaPcsGgOEhPaOThOdndnadcd9hmbabaDcetfgzax87ebazcdfar87ebazclfaP87ebxekabaDcdtfgzaxBdbazclfarBdbazcwfaPBdbkavaicdtfaxBdbavc;abfalcitfgzarBdbazaxBdlavaicefgicsGcdtfarBdbavc;abfalcefcsGcitfgzaPBdbazarBdlavaiaHfcsGgicdtfaPBdbavc;abfalcdfcsGglcitfgraxBdbaraPBdlalcefhlaiaOfhiasaOfhxxekaxcbaoRbbgzEgAarc;:eSgrfhsazcsGhCazcl4hXdndnazcs0mbascefhOxekashOavaiaX9RcsGcdtfydbhskdndnaCmbaOcefhxxekaOhxavaiaz9RcsGcdtfydbhOkdndnarTmbaocefhrxekaocdfhrao8SbegHcFeGhPdnaHcu9kmbaocofhAaPcFbGhPcrhodninar8SbbgHcFbGaotaPVhPaHcu9kmearcefhraocrfgoc8J9hmbkaAhrxekarcefhrkaPce4cbaPceG9R7amfgmhAkdndnaXcsSmbarhPxekarcefhPar8SbbgocFeGhHdnaocu9kmbarcvfhsaHcFbGhHcrhodninaP8SbbgrcFbGaotaHVhHarcu9kmeaPcefhPaocrfgoc8J9hmbkashPxekaPcefhPkaHce4cbaHceG9R7amfgmhskdndnaCcsSmbaPhoxekaPcefhoaP8SbbgrcFeGhHdnarcu9kmbaPcvfhOaHcFbGhHcrhrdninao8SbbgPcFbGartaHVhHaPcu9kmeaocefhoarcrfgrc8J9hmbkaOhoxekaocefhokaHce4cbaHceG9R7amfgmhOkdndnadcd9hmbabaDcetfgraA87ebarcdfas87ebarclfaO87ebxekabaDcdtfgraABdbarclfasBdbarcwfaOBdbkavc;abfalcitfgrasBdbaraABdlavaicdtfaABdbavc;abfalcefcsGcitfgraOBdbarasBdlavaicefgicsGcdtfasBdbavc;abfalcdfcsGcitfgraABdbaraOBdlavaiazcz6aXcsSVfgicsGcdtfaOBdbaiaCTaCcsSVfhialcifhlkawcefhwalcsGhlaicsGhiaDcifgDae6mbkkcbc99aoaqSEhokavc;aef8Kjjjjbaok:llevu8Jjjjjbcz9Rhvc9:hodnaecvfal0mbcuhoaiRbbc;:eGc;qe9hmbav9cb83iwaicefhraialfc98fhwdnaeTmbdnadcdSmbcbhDindnaraw6mbc9:skarcefhoar8SbbglcFeGhidndnalcu9mmbaohrxekarcvfhraicFbGhicrhldninao8SbbgdcFbGaltaiVhiadcu9kmeaocefhoalcrfglc8J9hmbxdkkaocefhrkabaDcdtfaicd4cbaice4ceG9R7avcwfaiceGcdtVgoydbfglBdbaoalBdbaDcefgDae9hmbxdkkcbhDindnaraw6mbc9:skarcefhoar8SbbglcFeGhidndnalcu9mmbaohrxekarcvfhraicFbGhicrhldninao8SbbgdcFbGaltaiVhiadcu9kmeaocefhoalcrfglc8J9hmbxdkkaocefhrkabaDcetfaicd4cbaice4ceG9R7avcwfaiceGcdtVgoydbfgl87ebaoalBdbaDcefgDae9hmbkkcbc99arawSEhokaok:Lvoeue99dud99eud99dndnadcl9hmbaeTmeindndnabcdfgd8Sbb:Yab8Sbbgi:Ygl:l:tabcefgv8Sbbgo:Ygr:l:tgwJbb;:9cawawNJbbbbawawJbbbb9GgDEgq:mgkaqaicb9iEalMgwawNakaqaocb9iEarMgqaqNMM:r:vglNJbbbZJbbb:;aDEMgr:lJbbb9p9DTmbar:Ohixekcjjjj94hikadai86bbdndnaqalNJbbbZJbbb:;aqJbbbb9GEMgq:lJbbb9p9DTmbaq:Ohdxekcjjjj94hdkavad86bbdndnawalNJbbbZJbbb:;awJbbbb9GEMgw:lJbbb9p9DTmbaw:Ohdxekcjjjj94hdkabad86bbabclfhbaecufgembxdkkaeTmbindndnabclfgd8Ueb:Yab8Uebgi:Ygl:l:tabcdfgv8Uebgo:Ygr:l:tgwJb;:FSawawNJbbbbawawJbbbb9GgDEgq:mgkaqaicb9iEalMgwawNakaqaocb9iEarMgqaqNMM:r:vglNJbbbZJbbb:;aDEMgr:lJbbb9p9DTmbar:Ohixekcjjjj94hikadai87ebdndnaqalNJbbbZJbbb:;aqJbbbb9GEMgq:lJbbb9p9DTmbaq:Ohdxekcjjjj94hdkavad87ebdndnawalNJbbbZJbbb:;awJbbbb9GEMgw:lJbbb9p9DTmbaw:Ohdxekcjjjj94hdkabad87ebabcwfhbaecufgembkkk;siliui99iue99dnaeTmbcbhiabhlindndnJ;Zl81Zalcof8UebgvciV:Y:vgoal8Ueb:YNgrJb;:FSNJbbbZJbbb:;arJbbbb9GEMgw:lJbbb9p9DTmbaw:OhDxekcjjjj94hDkalclf8Uebhqalcdf8UebhkabavcefciGaiVcetfaD87ebdndnaoak:YNgwJb;:FSNJbbbZJbbb:;awJbbbb9GEMgx:lJbbb9p9DTmbax:Ohkxekcjjjj94hkkabavcdfciGaiVcetfak87ebdndnaoaq:YNgoJb;:FSNJbbbZJbbb:;aoJbbbb9GEMgx:lJbbb9p9DTmbax:Ohqxekcjjjj94hqkabavcufciGaiVcetfaq87ebdndnJbbjZararN:tawawN:taoaoN:tgrJbbbbarJbbbb9GE:rJb;:FSNJbbbZMgr:lJbbb9p9DTmbar:Ohqxekcjjjj94hqkabavciGaiVcetfaq87ebalcwfhlaiclfhiaecufgembkkk9mbdnadcd4ae2geTmbinababydbgdcwtcw91:Yadce91cjjj;8ifcjjj98G::NUdbabclfhbaecufgembkkk9teiucbcbydj1jjbgeabcifc98GfgbBdj1jjbdndnabZbcztgd9nmbcuhiabad9RcFFifcz4nbcuSmekaehikaik;LeeeudndnaeabVciGTmbabhixekdndnadcz9pmbabhixekabhiinaiaeydbBdbaiclfaeclfydbBdbaicwfaecwfydbBdbaicxfaecxfydbBdbaiczfhiaeczfheadc9Wfgdcs0mbkkadcl6mbinaiaeydbBdbaeclfheaiclfhiadc98fgdci0mbkkdnadTmbinaiaeRbb86bbaicefhiaecefheadcufgdmbkkabk;aeedudndnabciGTmbabhixekaecFeGc:b:c:ew2hldndnadcz9pmbabhixekabhiinaialBdbaicxfalBdbaicwfalBdbaiclfalBdbaiczfhiadc9Wfgdcs0mbkkadcl6mbinaialBdbaiclfhiadc98fgdci0mbkkdnadTmbinaiae86bbaicefhiadcufgdmbkkabkkkebcjwklz9Kbb";
@@ -25274,11 +25451,890 @@ void main() {
     };
   })();
 
-  // ../outputs/lingzhu-control/model.mjs
+  // work/node_modules/three/examples/jsm/lines/LineSegmentsGeometry.js
+  var _box = new Box3();
+  var _vector = new Vector3();
+  var LineSegmentsGeometry = class extends InstancedBufferGeometry {
+    constructor() {
+      super();
+      this.isLineSegmentsGeometry = true;
+      this.type = "LineSegmentsGeometry";
+      const positions = [-1, 2, 0, 1, 2, 0, -1, 1, 0, 1, 1, 0, -1, 0, 0, 1, 0, 0, -1, -1, 0, 1, -1, 0];
+      const uvs = [-1, 2, 1, 2, -1, 1, 1, 1, -1, -1, 1, -1, -1, -2, 1, -2];
+      const index = [0, 2, 1, 2, 3, 1, 2, 4, 3, 4, 5, 3, 4, 6, 5, 6, 7, 5];
+      this.setIndex(index);
+      this.setAttribute("position", new Float32BufferAttribute(positions, 3));
+      this.setAttribute("uv", new Float32BufferAttribute(uvs, 2));
+    }
+    applyMatrix4(matrix) {
+      const start = this.attributes.instanceStart;
+      const end = this.attributes.instanceEnd;
+      if (start !== void 0) {
+        start.applyMatrix4(matrix);
+        end.applyMatrix4(matrix);
+        start.needsUpdate = true;
+      }
+      if (this.boundingBox !== null) {
+        this.computeBoundingBox();
+      }
+      if (this.boundingSphere !== null) {
+        this.computeBoundingSphere();
+      }
+      return this;
+    }
+    setPositions(array) {
+      let lineSegments;
+      if (array instanceof Float32Array) {
+        lineSegments = array;
+      } else if (Array.isArray(array)) {
+        lineSegments = new Float32Array(array);
+      }
+      const instanceBuffer = new InstancedInterleavedBuffer(lineSegments, 6, 1);
+      this.setAttribute("instanceStart", new InterleavedBufferAttribute(instanceBuffer, 3, 0));
+      this.setAttribute("instanceEnd", new InterleavedBufferAttribute(instanceBuffer, 3, 3));
+      this.computeBoundingBox();
+      this.computeBoundingSphere();
+      return this;
+    }
+    setColors(array) {
+      let colors;
+      if (array instanceof Float32Array) {
+        colors = array;
+      } else if (Array.isArray(array)) {
+        colors = new Float32Array(array);
+      }
+      const instanceColorBuffer = new InstancedInterleavedBuffer(colors, 6, 1);
+      this.setAttribute("instanceColorStart", new InterleavedBufferAttribute(instanceColorBuffer, 3, 0));
+      this.setAttribute("instanceColorEnd", new InterleavedBufferAttribute(instanceColorBuffer, 3, 3));
+      return this;
+    }
+    fromWireframeGeometry(geometry) {
+      this.setPositions(geometry.attributes.position.array);
+      return this;
+    }
+    fromEdgesGeometry(geometry) {
+      this.setPositions(geometry.attributes.position.array);
+      return this;
+    }
+    fromMesh(mesh) {
+      this.fromWireframeGeometry(new WireframeGeometry(mesh.geometry));
+      return this;
+    }
+    fromLineSegments(lineSegments) {
+      const geometry = lineSegments.geometry;
+      this.setPositions(geometry.attributes.position.array);
+      return this;
+    }
+    computeBoundingBox() {
+      if (this.boundingBox === null) {
+        this.boundingBox = new Box3();
+      }
+      const start = this.attributes.instanceStart;
+      const end = this.attributes.instanceEnd;
+      if (start !== void 0 && end !== void 0) {
+        this.boundingBox.setFromBufferAttribute(start);
+        _box.setFromBufferAttribute(end);
+        this.boundingBox.union(_box);
+      }
+    }
+    computeBoundingSphere() {
+      if (this.boundingSphere === null) {
+        this.boundingSphere = new Sphere();
+      }
+      if (this.boundingBox === null) {
+        this.computeBoundingBox();
+      }
+      const start = this.attributes.instanceStart;
+      const end = this.attributes.instanceEnd;
+      if (start !== void 0 && end !== void 0) {
+        const center = this.boundingSphere.center;
+        this.boundingBox.getCenter(center);
+        let maxRadiusSq = 0;
+        for (let i = 0, il = start.count; i < il; i++) {
+          _vector.fromBufferAttribute(start, i);
+          maxRadiusSq = Math.max(maxRadiusSq, center.distanceToSquared(_vector));
+          _vector.fromBufferAttribute(end, i);
+          maxRadiusSq = Math.max(maxRadiusSq, center.distanceToSquared(_vector));
+        }
+        this.boundingSphere.radius = Math.sqrt(maxRadiusSq);
+        if (isNaN(this.boundingSphere.radius)) {
+          console.error("THREE.LineSegmentsGeometry.computeBoundingSphere(): Computed radius is NaN. The instanced position data is likely to have NaN values.", this);
+        }
+      }
+    }
+    toJSON() {
+    }
+    applyMatrix(matrix) {
+      console.warn("THREE.LineSegmentsGeometry: applyMatrix() has been renamed to applyMatrix4().");
+      return this.applyMatrix4(matrix);
+    }
+  };
+
+  // work/node_modules/three/examples/jsm/lines/LineMaterial.js
+  UniformsLib.line = {
+    worldUnits: { value: 1 },
+    linewidth: { value: 1 },
+    resolution: { value: new Vector2(1, 1) },
+    dashOffset: { value: 0 },
+    dashScale: { value: 1 },
+    dashSize: { value: 1 },
+    gapSize: { value: 1 }
+    // todo FIX - maybe change to totalSize
+  };
+  ShaderLib["line"] = {
+    uniforms: UniformsUtils.merge([
+      UniformsLib.common,
+      UniformsLib.fog,
+      UniformsLib.line
+    ]),
+    vertexShader: (
+      /* glsl */
+      `
+		#include <common>
+		#include <color_pars_vertex>
+		#include <fog_pars_vertex>
+		#include <logdepthbuf_pars_vertex>
+		#include <clipping_planes_pars_vertex>
+
+		uniform float linewidth;
+		uniform vec2 resolution;
+
+		attribute vec3 instanceStart;
+		attribute vec3 instanceEnd;
+
+		attribute vec3 instanceColorStart;
+		attribute vec3 instanceColorEnd;
+
+		#ifdef WORLD_UNITS
+
+			varying vec4 worldPos;
+			varying vec3 worldStart;
+			varying vec3 worldEnd;
+
+			#ifdef USE_DASH
+
+				varying vec2 vUv;
+
+			#endif
+
+		#else
+
+			varying vec2 vUv;
+
+		#endif
+
+		#ifdef USE_DASH
+
+			uniform float dashScale;
+			attribute float instanceDistanceStart;
+			attribute float instanceDistanceEnd;
+			varying float vLineDistance;
+
+		#endif
+
+		void trimSegment( const in vec4 start, inout vec4 end ) {
+
+			// trim end segment so it terminates between the camera plane and the near plane
+
+			// conservative estimate of the near plane
+			float a = projectionMatrix[ 2 ][ 2 ]; // 3nd entry in 3th column
+			float b = projectionMatrix[ 3 ][ 2 ]; // 3nd entry in 4th column
+			float nearEstimate = - 0.5 * b / a;
+
+			float alpha = ( nearEstimate - start.z ) / ( end.z - start.z );
+
+			end.xyz = mix( start.xyz, end.xyz, alpha );
+
+		}
+
+		void main() {
+
+			#ifdef USE_COLOR
+
+				vColor.xyz = ( position.y < 0.5 ) ? instanceColorStart : instanceColorEnd;
+
+			#endif
+
+			#ifdef USE_DASH
+
+				vLineDistance = ( position.y < 0.5 ) ? dashScale * instanceDistanceStart : dashScale * instanceDistanceEnd;
+				vUv = uv;
+
+			#endif
+
+			float aspect = resolution.x / resolution.y;
+
+			// camera space
+			vec4 start = modelViewMatrix * vec4( instanceStart, 1.0 );
+			vec4 end = modelViewMatrix * vec4( instanceEnd, 1.0 );
+
+			#ifdef WORLD_UNITS
+
+				worldStart = start.xyz;
+				worldEnd = end.xyz;
+
+			#else
+
+				vUv = uv;
+
+			#endif
+
+			// special case for perspective projection, and segments that terminate either in, or behind, the camera plane
+			// clearly the gpu firmware has a way of addressing this issue when projecting into ndc space
+			// but we need to perform ndc-space calculations in the shader, so we must address this issue directly
+			// perhaps there is a more elegant solution -- WestLangley
+
+			bool perspective = ( projectionMatrix[ 2 ][ 3 ] == - 1.0 ); // 4th entry in the 3rd column
+
+			if ( perspective ) {
+
+				if ( start.z < 0.0 && end.z >= 0.0 ) {
+
+					trimSegment( start, end );
+
+				} else if ( end.z < 0.0 && start.z >= 0.0 ) {
+
+					trimSegment( end, start );
+
+				}
+
+			}
+
+			// clip space
+			vec4 clipStart = projectionMatrix * start;
+			vec4 clipEnd = projectionMatrix * end;
+
+			// ndc space
+			vec3 ndcStart = clipStart.xyz / clipStart.w;
+			vec3 ndcEnd = clipEnd.xyz / clipEnd.w;
+
+			// direction
+			vec2 dir = ndcEnd.xy - ndcStart.xy;
+
+			// account for clip-space aspect ratio
+			dir.x *= aspect;
+			dir = normalize( dir );
+
+			#ifdef WORLD_UNITS
+
+				vec3 worldDir = normalize( end.xyz - start.xyz );
+				vec3 tmpFwd = normalize( mix( start.xyz, end.xyz, 0.5 ) );
+				vec3 worldUp = normalize( cross( worldDir, tmpFwd ) );
+				vec3 worldFwd = cross( worldDir, worldUp );
+				worldPos = position.y < 0.5 ? start: end;
+
+				// height offset
+				float hw = linewidth * 0.5;
+				worldPos.xyz += position.x < 0.0 ? hw * worldUp : - hw * worldUp;
+
+				// don't extend the line if we're rendering dashes because we
+				// won't be rendering the endcaps
+				#ifndef USE_DASH
+
+					// cap extension
+					worldPos.xyz += position.y < 0.5 ? - hw * worldDir : hw * worldDir;
+
+					// add width to the box
+					worldPos.xyz += worldFwd * hw;
+
+					// endcaps
+					if ( position.y > 1.0 || position.y < 0.0 ) {
+
+						worldPos.xyz -= worldFwd * 2.0 * hw;
+
+					}
+
+				#endif
+
+				// project the worldpos
+				vec4 clip = projectionMatrix * worldPos;
+
+				// shift the depth of the projected points so the line
+				// segments overlap neatly
+				vec3 clipPose = ( position.y < 0.5 ) ? ndcStart : ndcEnd;
+				clip.z = clipPose.z * clip.w;
+
+			#else
+
+				vec2 offset = vec2( dir.y, - dir.x );
+				// undo aspect ratio adjustment
+				dir.x /= aspect;
+				offset.x /= aspect;
+
+				// sign flip
+				if ( position.x < 0.0 ) offset *= - 1.0;
+
+				// endcaps
+				if ( position.y < 0.0 ) {
+
+					offset += - dir;
+
+				} else if ( position.y > 1.0 ) {
+
+					offset += dir;
+
+				}
+
+				// adjust for linewidth
+				offset *= linewidth;
+
+				// adjust for clip-space to screen-space conversion // maybe resolution should be based on viewport ...
+				offset /= resolution.y;
+
+				// select end
+				vec4 clip = ( position.y < 0.5 ) ? clipStart : clipEnd;
+
+				// back to clip space
+				offset *= clip.w;
+
+				clip.xy += offset;
+
+			#endif
+
+			gl_Position = clip;
+
+			vec4 mvPosition = ( position.y < 0.5 ) ? start : end; // this is an approximation
+
+			#include <logdepthbuf_vertex>
+			#include <clipping_planes_vertex>
+			#include <fog_vertex>
+
+		}
+		`
+    ),
+    fragmentShader: (
+      /* glsl */
+      `
+		uniform vec3 diffuse;
+		uniform float opacity;
+		uniform float linewidth;
+
+		#ifdef USE_DASH
+
+			uniform float dashOffset;
+			uniform float dashSize;
+			uniform float gapSize;
+
+		#endif
+
+		varying float vLineDistance;
+
+		#ifdef WORLD_UNITS
+
+			varying vec4 worldPos;
+			varying vec3 worldStart;
+			varying vec3 worldEnd;
+
+			#ifdef USE_DASH
+
+				varying vec2 vUv;
+
+			#endif
+
+		#else
+
+			varying vec2 vUv;
+
+		#endif
+
+		#include <common>
+		#include <color_pars_fragment>
+		#include <fog_pars_fragment>
+		#include <logdepthbuf_pars_fragment>
+		#include <clipping_planes_pars_fragment>
+
+		vec2 closestLineToLine(vec3 p1, vec3 p2, vec3 p3, vec3 p4) {
+
+			float mua;
+			float mub;
+
+			vec3 p13 = p1 - p3;
+			vec3 p43 = p4 - p3;
+
+			vec3 p21 = p2 - p1;
+
+			float d1343 = dot( p13, p43 );
+			float d4321 = dot( p43, p21 );
+			float d1321 = dot( p13, p21 );
+			float d4343 = dot( p43, p43 );
+			float d2121 = dot( p21, p21 );
+
+			float denom = d2121 * d4343 - d4321 * d4321;
+
+			float numer = d1343 * d4321 - d1321 * d4343;
+
+			mua = numer / denom;
+			mua = clamp( mua, 0.0, 1.0 );
+			mub = ( d1343 + d4321 * ( mua ) ) / d4343;
+			mub = clamp( mub, 0.0, 1.0 );
+
+			return vec2( mua, mub );
+
+		}
+
+		void main() {
+
+			#include <clipping_planes_fragment>
+
+			#ifdef USE_DASH
+
+				if ( vUv.y < - 1.0 || vUv.y > 1.0 ) discard; // discard endcaps
+
+				if ( mod( vLineDistance + dashOffset, dashSize + gapSize ) > dashSize ) discard; // todo - FIX
+
+			#endif
+
+			float alpha = opacity;
+
+			#ifdef WORLD_UNITS
+
+				// Find the closest points on the view ray and the line segment
+				vec3 rayEnd = normalize( worldPos.xyz ) * 1e5;
+				vec3 lineDir = worldEnd - worldStart;
+				vec2 params = closestLineToLine( worldStart, worldEnd, vec3( 0.0, 0.0, 0.0 ), rayEnd );
+
+				vec3 p1 = worldStart + lineDir * params.x;
+				vec3 p2 = rayEnd * params.y;
+				vec3 delta = p1 - p2;
+				float len = length( delta );
+				float norm = len / linewidth;
+
+				#ifndef USE_DASH
+
+					#ifdef USE_ALPHA_TO_COVERAGE
+
+						float dnorm = fwidth( norm );
+						alpha = 1.0 - smoothstep( 0.5 - dnorm, 0.5 + dnorm, norm );
+
+					#else
+
+						if ( norm > 0.5 ) {
+
+							discard;
+
+						}
+
+					#endif
+
+				#endif
+
+			#else
+
+				#ifdef USE_ALPHA_TO_COVERAGE
+
+					// artifacts appear on some hardware if a derivative is taken within a conditional
+					float a = vUv.x;
+					float b = ( vUv.y > 0.0 ) ? vUv.y - 1.0 : vUv.y + 1.0;
+					float len2 = a * a + b * b;
+					float dlen = fwidth( len2 );
+
+					if ( abs( vUv.y ) > 1.0 ) {
+
+						alpha = 1.0 - smoothstep( 1.0 - dlen, 1.0 + dlen, len2 );
+
+					}
+
+				#else
+
+					if ( abs( vUv.y ) > 1.0 ) {
+
+						float a = vUv.x;
+						float b = ( vUv.y > 0.0 ) ? vUv.y - 1.0 : vUv.y + 1.0;
+						float len2 = a * a + b * b;
+
+						if ( len2 > 1.0 ) discard;
+
+					}
+
+				#endif
+
+			#endif
+
+			vec4 diffuseColor = vec4( diffuse, alpha );
+
+			#include <logdepthbuf_fragment>
+			#include <color_fragment>
+
+			gl_FragColor = vec4( diffuseColor.rgb, alpha );
+
+			#include <tonemapping_fragment>
+			#include <colorspace_fragment>
+			#include <fog_fragment>
+			#include <premultiplied_alpha_fragment>
+
+		}
+		`
+    )
+  };
+  var LineMaterial = class extends ShaderMaterial {
+    constructor(parameters) {
+      super({
+        type: "LineMaterial",
+        uniforms: UniformsUtils.clone(ShaderLib["line"].uniforms),
+        vertexShader: ShaderLib["line"].vertexShader,
+        fragmentShader: ShaderLib["line"].fragmentShader,
+        clipping: true
+        // required for clipping support
+      });
+      this.isLineMaterial = true;
+      this.setValues(parameters);
+    }
+    get color() {
+      return this.uniforms.diffuse.value;
+    }
+    set color(value) {
+      this.uniforms.diffuse.value = value;
+    }
+    get worldUnits() {
+      return "WORLD_UNITS" in this.defines;
+    }
+    set worldUnits(value) {
+      if (value === true) {
+        this.defines.WORLD_UNITS = "";
+      } else {
+        delete this.defines.WORLD_UNITS;
+      }
+    }
+    get linewidth() {
+      return this.uniforms.linewidth.value;
+    }
+    set linewidth(value) {
+      if (!this.uniforms.linewidth) return;
+      this.uniforms.linewidth.value = value;
+    }
+    get dashed() {
+      return "USE_DASH" in this.defines;
+    }
+    set dashed(value) {
+      if (value === true !== this.dashed) {
+        this.needsUpdate = true;
+      }
+      if (value === true) {
+        this.defines.USE_DASH = "";
+      } else {
+        delete this.defines.USE_DASH;
+      }
+    }
+    get dashScale() {
+      return this.uniforms.dashScale.value;
+    }
+    set dashScale(value) {
+      this.uniforms.dashScale.value = value;
+    }
+    get dashSize() {
+      return this.uniforms.dashSize.value;
+    }
+    set dashSize(value) {
+      this.uniforms.dashSize.value = value;
+    }
+    get dashOffset() {
+      return this.uniforms.dashOffset.value;
+    }
+    set dashOffset(value) {
+      this.uniforms.dashOffset.value = value;
+    }
+    get gapSize() {
+      return this.uniforms.gapSize.value;
+    }
+    set gapSize(value) {
+      this.uniforms.gapSize.value = value;
+    }
+    get opacity() {
+      return this.uniforms.opacity.value;
+    }
+    set opacity(value) {
+      if (!this.uniforms) return;
+      this.uniforms.opacity.value = value;
+    }
+    get resolution() {
+      return this.uniforms.resolution.value;
+    }
+    set resolution(value) {
+      this.uniforms.resolution.value.copy(value);
+    }
+    get alphaToCoverage() {
+      return "USE_ALPHA_TO_COVERAGE" in this.defines;
+    }
+    set alphaToCoverage(value) {
+      if (!this.defines) return;
+      if (value === true !== this.alphaToCoverage) {
+        this.needsUpdate = true;
+      }
+      if (value === true) {
+        this.defines.USE_ALPHA_TO_COVERAGE = "";
+      } else {
+        delete this.defines.USE_ALPHA_TO_COVERAGE;
+      }
+    }
+  };
+
+  // work/node_modules/three/examples/jsm/lines/LineSegments2.js
+  var _viewport = new Vector4();
+  var _start2 = new Vector3();
+  var _end2 = new Vector3();
+  var _start4 = new Vector4();
+  var _end4 = new Vector4();
+  var _ssOrigin = new Vector4();
+  var _ssOrigin3 = new Vector3();
+  var _mvMatrix = new Matrix4();
+  var _line = new Line3();
+  var _closestPoint = new Vector3();
+  var _box2 = new Box3();
+  var _sphere2 = new Sphere();
+  var _clipToWorldVector = new Vector4();
+  var _ray3;
+  var _lineWidth;
+  function getWorldSpaceHalfWidth(camera2, distance2, resolution) {
+    _clipToWorldVector.set(0, 0, -distance2, 1).applyMatrix4(camera2.projectionMatrix);
+    _clipToWorldVector.multiplyScalar(1 / _clipToWorldVector.w);
+    _clipToWorldVector.x = _lineWidth / resolution.width;
+    _clipToWorldVector.y = _lineWidth / resolution.height;
+    _clipToWorldVector.applyMatrix4(camera2.projectionMatrixInverse);
+    _clipToWorldVector.multiplyScalar(1 / _clipToWorldVector.w);
+    return Math.abs(Math.max(_clipToWorldVector.x, _clipToWorldVector.y));
+  }
+  function raycastWorldUnits(lineSegments, intersects) {
+    const matrixWorld = lineSegments.matrixWorld;
+    const geometry = lineSegments.geometry;
+    const instanceStart = geometry.attributes.instanceStart;
+    const instanceEnd = geometry.attributes.instanceEnd;
+    const segmentCount = Math.min(geometry.instanceCount, instanceStart.count);
+    for (let i = 0, l = segmentCount; i < l; i++) {
+      _line.start.fromBufferAttribute(instanceStart, i);
+      _line.end.fromBufferAttribute(instanceEnd, i);
+      _line.applyMatrix4(matrixWorld);
+      const pointOnLine = new Vector3();
+      const point = new Vector3();
+      _ray3.distanceSqToSegment(_line.start, _line.end, point, pointOnLine);
+      const isInside = point.distanceTo(pointOnLine) < _lineWidth * 0.5;
+      if (isInside) {
+        intersects.push({
+          point,
+          pointOnLine,
+          distance: _ray3.origin.distanceTo(point),
+          object: lineSegments,
+          face: null,
+          faceIndex: i,
+          uv: null,
+          uv1: null
+        });
+      }
+    }
+  }
+  function raycastScreenSpace(lineSegments, camera2, intersects) {
+    const projectionMatrix = camera2.projectionMatrix;
+    const material = lineSegments.material;
+    const resolution = material.resolution;
+    const matrixWorld = lineSegments.matrixWorld;
+    const geometry = lineSegments.geometry;
+    const instanceStart = geometry.attributes.instanceStart;
+    const instanceEnd = geometry.attributes.instanceEnd;
+    const segmentCount = Math.min(geometry.instanceCount, instanceStart.count);
+    const near = -camera2.near;
+    _ray3.at(1, _ssOrigin);
+    _ssOrigin.w = 1;
+    _ssOrigin.applyMatrix4(camera2.matrixWorldInverse);
+    _ssOrigin.applyMatrix4(projectionMatrix);
+    _ssOrigin.multiplyScalar(1 / _ssOrigin.w);
+    _ssOrigin.x *= resolution.x / 2;
+    _ssOrigin.y *= resolution.y / 2;
+    _ssOrigin.z = 0;
+    _ssOrigin3.copy(_ssOrigin);
+    _mvMatrix.multiplyMatrices(camera2.matrixWorldInverse, matrixWorld);
+    for (let i = 0, l = segmentCount; i < l; i++) {
+      _start4.fromBufferAttribute(instanceStart, i);
+      _end4.fromBufferAttribute(instanceEnd, i);
+      _start4.w = 1;
+      _end4.w = 1;
+      _start4.applyMatrix4(_mvMatrix);
+      _end4.applyMatrix4(_mvMatrix);
+      const isBehindCameraNear = _start4.z > near && _end4.z > near;
+      if (isBehindCameraNear) {
+        continue;
+      }
+      if (_start4.z > near) {
+        const deltaDist = _start4.z - _end4.z;
+        const t = (_start4.z - near) / deltaDist;
+        _start4.lerp(_end4, t);
+      } else if (_end4.z > near) {
+        const deltaDist = _end4.z - _start4.z;
+        const t = (_end4.z - near) / deltaDist;
+        _end4.lerp(_start4, t);
+      }
+      _start4.applyMatrix4(projectionMatrix);
+      _end4.applyMatrix4(projectionMatrix);
+      _start4.multiplyScalar(1 / _start4.w);
+      _end4.multiplyScalar(1 / _end4.w);
+      _start4.x *= resolution.x / 2;
+      _start4.y *= resolution.y / 2;
+      _end4.x *= resolution.x / 2;
+      _end4.y *= resolution.y / 2;
+      _line.start.copy(_start4);
+      _line.start.z = 0;
+      _line.end.copy(_end4);
+      _line.end.z = 0;
+      const param = _line.closestPointToPointParameter(_ssOrigin3, true);
+      _line.at(param, _closestPoint);
+      const zPos = MathUtils.lerp(_start4.z, _end4.z, param);
+      const isInClipSpace = zPos >= -1 && zPos <= 1;
+      const isInside = _ssOrigin3.distanceTo(_closestPoint) < _lineWidth * 0.5;
+      if (isInClipSpace && isInside) {
+        _line.start.fromBufferAttribute(instanceStart, i);
+        _line.end.fromBufferAttribute(instanceEnd, i);
+        _line.start.applyMatrix4(matrixWorld);
+        _line.end.applyMatrix4(matrixWorld);
+        const pointOnLine = new Vector3();
+        const point = new Vector3();
+        _ray3.distanceSqToSegment(_line.start, _line.end, point, pointOnLine);
+        intersects.push({
+          point,
+          pointOnLine,
+          distance: _ray3.origin.distanceTo(point),
+          object: lineSegments,
+          face: null,
+          faceIndex: i,
+          uv: null,
+          uv1: null
+        });
+      }
+    }
+  }
+  var LineSegments2 = class extends Mesh {
+    constructor(geometry = new LineSegmentsGeometry(), material = new LineMaterial({ color: Math.random() * 16777215 })) {
+      super(geometry, material);
+      this.isLineSegments2 = true;
+      this.type = "LineSegments2";
+    }
+    // for backwards-compatibility, but could be a method of LineSegmentsGeometry...
+    computeLineDistances() {
+      const geometry = this.geometry;
+      const instanceStart = geometry.attributes.instanceStart;
+      const instanceEnd = geometry.attributes.instanceEnd;
+      const lineDistances = new Float32Array(2 * instanceStart.count);
+      for (let i = 0, j = 0, l = instanceStart.count; i < l; i++, j += 2) {
+        _start2.fromBufferAttribute(instanceStart, i);
+        _end2.fromBufferAttribute(instanceEnd, i);
+        lineDistances[j] = j === 0 ? 0 : lineDistances[j - 1];
+        lineDistances[j + 1] = lineDistances[j] + _start2.distanceTo(_end2);
+      }
+      const instanceDistanceBuffer = new InstancedInterleavedBuffer(lineDistances, 2, 1);
+      geometry.setAttribute("instanceDistanceStart", new InterleavedBufferAttribute(instanceDistanceBuffer, 1, 0));
+      geometry.setAttribute("instanceDistanceEnd", new InterleavedBufferAttribute(instanceDistanceBuffer, 1, 1));
+      return this;
+    }
+    raycast(raycaster2, intersects) {
+      const worldUnits = this.material.worldUnits;
+      const camera2 = raycaster2.camera;
+      if (camera2 === null && !worldUnits) {
+        console.error('LineSegments2: "Raycaster.camera" needs to be set in order to raycast against LineSegments2 while worldUnits is set to false.');
+      }
+      const threshold = raycaster2.params.Line2 !== void 0 ? raycaster2.params.Line2.threshold || 0 : 0;
+      _ray3 = raycaster2.ray;
+      const matrixWorld = this.matrixWorld;
+      const geometry = this.geometry;
+      const material = this.material;
+      _lineWidth = material.linewidth + threshold;
+      if (geometry.boundingSphere === null) {
+        geometry.computeBoundingSphere();
+      }
+      _sphere2.copy(geometry.boundingSphere).applyMatrix4(matrixWorld);
+      let sphereMargin;
+      if (worldUnits) {
+        sphereMargin = _lineWidth * 0.5;
+      } else {
+        const distanceToSphere = Math.max(camera2.near, _sphere2.distanceToPoint(_ray3.origin));
+        sphereMargin = getWorldSpaceHalfWidth(camera2, distanceToSphere, material.resolution);
+      }
+      _sphere2.radius += sphereMargin;
+      if (_ray3.intersectsSphere(_sphere2) === false) {
+        return;
+      }
+      if (geometry.boundingBox === null) {
+        geometry.computeBoundingBox();
+      }
+      _box2.copy(geometry.boundingBox).applyMatrix4(matrixWorld);
+      let boxMargin;
+      if (worldUnits) {
+        boxMargin = _lineWidth * 0.5;
+      } else {
+        const distanceToBox = Math.max(camera2.near, _box2.distanceToPoint(_ray3.origin));
+        boxMargin = getWorldSpaceHalfWidth(camera2, distanceToBox, material.resolution);
+      }
+      _box2.expandByScalar(boxMargin);
+      if (_ray3.intersectsBox(_box2) === false) {
+        return;
+      }
+      if (worldUnits) {
+        raycastWorldUnits(this, intersects);
+      } else {
+        raycastScreenSpace(this, camera2, intersects);
+      }
+    }
+    onBeforeRender(renderer2) {
+      const uniforms = this.material.uniforms;
+      if (uniforms && uniforms.resolution) {
+        renderer2.getViewport(_viewport);
+        this.material.uniforms.resolution.value.set(_viewport.z, _viewport.w);
+      }
+    }
+  };
+
+  // work/node_modules/three/examples/jsm/lines/LineGeometry.js
+  var LineGeometry = class extends LineSegmentsGeometry {
+    constructor() {
+      super();
+      this.isLineGeometry = true;
+      this.type = "LineGeometry";
+    }
+    setPositions(array) {
+      const length = array.length - 3;
+      const points = new Float32Array(2 * length);
+      for (let i = 0; i < length; i += 3) {
+        points[2 * i] = array[i];
+        points[2 * i + 1] = array[i + 1];
+        points[2 * i + 2] = array[i + 2];
+        points[2 * i + 3] = array[i + 3];
+        points[2 * i + 4] = array[i + 4];
+        points[2 * i + 5] = array[i + 5];
+      }
+      super.setPositions(points);
+      return this;
+    }
+    setColors(array) {
+      const length = array.length - 3;
+      const colors = new Float32Array(2 * length);
+      for (let i = 0; i < length; i += 3) {
+        colors[2 * i] = array[i];
+        colors[2 * i + 1] = array[i + 1];
+        colors[2 * i + 2] = array[i + 2];
+        colors[2 * i + 3] = array[i + 3];
+        colors[2 * i + 4] = array[i + 4];
+        colors[2 * i + 5] = array[i + 5];
+      }
+      super.setColors(colors);
+      return this;
+    }
+    fromLine(line) {
+      const geometry = line.geometry;
+      this.setPositions(geometry.attributes.position.array);
+      return this;
+    }
+  };
+
+  // work/node_modules/three/examples/jsm/lines/Line2.js
+  var Line2 = class extends LineSegments2 {
+    constructor(geometry = new LineGeometry(), material = new LineMaterial({ color: Math.random() * 16777215 })) {
+      super(geometry, material);
+      this.isLine2 = true;
+      this.type = "Line2";
+    }
+  };
+
+  // outputs/html-version/model.mjs
   var LIMITS = {
-    arm1: { min: 0, max: 120, label: "\u81C21" },
-    arm2: { min: 0, max: 180, label: "\u81C22" },
-    arm3: { min: 0, max: 180, label: "\u81C23" },
+    arm1: { min: 0, max: 128, label: "\u81C21" },
+    arm2: { min: 5, max: 180, label: "\u81C22" },
+    arm3: { min: -10, max: 180, label: "\u81C23" },
     offset: { min: -270, max: 210, label: "\u6253\u5370\u5934" },
     base: { min: -180, max: 180, label: "\u65CB\u8F6C" }
   };
@@ -25322,6 +26378,14 @@ void main() {
   var SIDE_OFFSET_MM = 230;
   var ARM1_ACTUATOR_SIDE_OFFSET_MM = 291;
   var ARM2_ACTUATOR_SIDE_OFFSET_MM = 195.5;
+  var ACTUATOR_STROKE_LIMITS = {
+    arm1: { minLength: 1286.6, strokeLength: 900, label: "\u7535\u7F381" },
+    arm2: { minLength: 1177.9, strokeLength: 710, label: "\u7535\u7F382" },
+    arm3: { minLength: 1405.8, strokeLength: 580, label: "\u7535\u7F383" }
+  };
+  Object.values(ACTUATOR_STROKE_LIMITS).forEach((limit) => {
+    limit.maxLength = Number((limit.minLength + limit.strokeLength).toFixed(3));
+  });
   var ACTUATOR_GROUPS = {
     arm1: {
       label: "\u7535\u7F381",
@@ -25547,6 +26611,32 @@ void main() {
       length: distance(withSide(center.tail, side), withSide(center.front, side))
     }));
   }
+  function actuatorStrokeForLength(groupKey, length) {
+    const limits = ACTUATOR_STROKE_LIMITS[groupKey];
+    if (!limits) return { stroke: 0, violation: 0, withinStroke: true };
+    const stroke = (length - limits.minLength) / limits.strokeLength;
+    const under = Math.max(0, limits.minLength - length);
+    const over = Math.max(0, length - limits.maxLength);
+    return {
+      minLength: limits.minLength,
+      maxLength: limits.maxLength,
+      strokeLength: limits.strokeLength,
+      stroke: clamp2(stroke, 0, 1),
+      rawStroke: stroke,
+      violation: under + over,
+      withinStroke: under + over <= 0.25
+    };
+  }
+  function annotateActuatorGroup(groupKey, group, center) {
+    const instances = makeActuatorInstances(group, center);
+    const length = instances[0]?.length || 0;
+    return {
+      ...group,
+      center,
+      instances,
+      ...actuatorStrokeForLength(groupKey, length)
+    };
+  }
   function computeActuators(pose, linkages = null) {
     const arm1Center = {
       tail: ACTUATOR_GROUPS.arm1.tail,
@@ -25561,9 +26651,9 @@ void main() {
       front: linkages?.B?.center?.common || pointOnPoseSegment(pose, ACTUATOR_GROUPS.arm3.frontWorldAtCalibration, "arm3")
     };
     return {
-      arm1: { ...ACTUATOR_GROUPS.arm1, center: arm1Center, instances: makeActuatorInstances(ACTUATOR_GROUPS.arm1, arm1Center) },
-      arm2: { ...ACTUATOR_GROUPS.arm2, center: arm2Center, instances: makeActuatorInstances(ACTUATOR_GROUPS.arm2, arm2Center) },
-      arm3: { ...ACTUATOR_GROUPS.arm3, center: arm3Center, instances: makeActuatorInstances(ACTUATOR_GROUPS.arm3, arm3Center) }
+      arm1: annotateActuatorGroup("arm1", ACTUATOR_GROUPS.arm1, arm1Center),
+      arm2: annotateActuatorGroup("arm2", ACTUATOR_GROUPS.arm2, arm2Center),
+      arm3: annotateActuatorGroup("arm3", ACTUATOR_GROUPS.arm3, arm3Center)
     };
   }
   function makeLinkageInstances(group, center) {
@@ -25677,13 +26767,44 @@ void main() {
     pose.actuators = computeActuators(pose, pose.linkages);
     return pose;
   }
+  function actuatorLengthForState(state2, key) {
+    return computePose(state2).actuators[key].instances[0].length;
+  }
+  function actuatorStrokeViolationForPose(pose) {
+    return Object.values(pose.actuators).reduce((sum, actuator) => sum + (actuator.violation || 0), 0);
+  }
+  function actuatorStrokeViolationForState(state2) {
+    return actuatorStrokeViolationForPose(computePose(state2));
+  }
+  function stateForActuatorStroke(key, normalizedStroke, currentState) {
+    const limits = ACTUATOR_STROKE_LIMITS[key];
+    if (!limits) return currentState;
+    const targetLength = limits.minLength + limits.strokeLength * clamp2(normalizedStroke, 0, 1);
+    const angleLimit = LIMITS[key];
+    let bestState = clampState(currentState);
+    let bestScore = Infinity;
+    const evaluate = (angle) => {
+      const candidate = clampState({ ...currentState, [key]: angle });
+      const length = actuatorLengthForState(candidate, key);
+      const score = Math.abs(length - targetLength) + Math.abs(angleDistance(candidate[key], currentState[key])) * 1e-3;
+      if (score < bestScore) {
+        bestScore = score;
+        bestState = candidate;
+      }
+    };
+    for (let angle = angleLimit.min; angle <= angleLimit.max; angle += 1) evaluate(angle);
+    const start = Math.max(angleLimit.min, bestState[key] - 1.5);
+    const end = Math.min(angleLimit.max, bestState[key] + 1.5);
+    for (let angle = start; angle <= end; angle += 0.02) evaluate(angle);
+    return bestState;
+  }
   function stateFromActuatorStrokes(strokes, currentState = DEFAULT_STATE) {
-    return clampState({
-      ...currentState,
-      arm1: strokes.arm1 == null ? currentState.arm1 : LIMITS.arm1.min + (LIMITS.arm1.max - LIMITS.arm1.min) * clamp2(strokes.arm1, 0, 1),
-      arm2: strokes.arm2 == null ? currentState.arm2 : LIMITS.arm2.max - (LIMITS.arm2.max - LIMITS.arm2.min) * clamp2(strokes.arm2, 0, 1),
-      arm3: strokes.arm3 == null ? currentState.arm3 : LIMITS.arm3.max - (LIMITS.arm3.max - LIMITS.arm3.min) * clamp2(strokes.arm3, 0, 1)
+    let nextState = clampState(currentState);
+    ["arm1", "arm2", "arm3"].forEach((key) => {
+      if (strokes[key] == null) return;
+      nextState = stateForActuatorStroke(key, strokes[key], nextState);
     });
+    return clampState(nextState);
   }
   function worldDisplayedToolPointForState(rawState, displayOffset = {}) {
     const state2 = clampState(rawState);
@@ -25703,8 +26824,9 @@ void main() {
     const score = (state2) => {
       const displayTip = worldDisplayedToolPointForState(state2, displayOffset);
       const distance2 = Math.hypot(displayTip.x - target.x, displayTip.y - target.y, displayTip.z - target.z);
+      const actuatorPenalty = actuatorStrokeViolationForState(state2) * 1e3;
       const continuity = Math.abs(angleDistance(state2.arm1, currentState.arm1)) * 0.08 + Math.abs(angleDistance(state2.arm2, currentState.arm2)) * 0.04 + Math.abs(angleDistance(state2.arm3, currentState.arm3)) * 0.04 + Math.abs(angleDistance(state2.base, currentState.base)) * 0.04;
-      return distance2 + continuity;
+      return distance2 + continuity + actuatorPenalty;
     };
     let bestScore = score(candidate);
     for (let iteration = 0; iteration < 240; iteration += 1) {
@@ -25730,12 +26852,31 @@ void main() {
       pose,
       target,
       error: score(candidate),
+      actuatorViolation: actuatorStrokeViolationForPose(pose),
       reachable: bestScore < 35
     };
   }
 
-  // ../outputs/lingzhu-control/app.mjs
-  var SCRIPT_VERSION = "20260702-qt-hybrid-stage";
+  // outputs/html-version/coordinates.mjs
+  var DEVICE_SCENE_ROTATION_Y_RAD = Math.PI;
+  var COORDINATE_SYSTEM_NOTE = "CSV X/Y/Z = 3D\u89C6\u89D2 X/Y/Z\uFF0C\u9ED8\u8BA43D\u89C6\u89D2 X+\u5411\u5DE6\u4E0A\u3001Y+\u5411\u53F3\u4E0A\uFF0CZ\u4E3A\u9AD8\u5EA6\uFF0C\u5355\u4F4D mm";
+  function deviceToSceneVectorData(point, scale = 1) {
+    return {
+      x: Number(point.x || 0) * scale,
+      y: Number(point.z || 0) * scale,
+      z: Number(point.y || 0) * scale
+    };
+  }
+  function sceneToDevicePointData(vector, scale = 1) {
+    return {
+      x: Number(vector.x || 0) / scale,
+      y: Number(vector.z || 0) / scale,
+      z: Number(vector.y || 0) / scale
+    };
+  }
+
+  // outputs/html-version/app.mjs
+  var SCRIPT_VERSION = "20260703-path-progress";
   var RENDER_SCALE = 1 / 1e3;
   var QT_STAGE_MODE = new URLSearchParams(window.location.search).has("qtStage");
   if (QT_STAGE_MODE) document.documentElement.dataset.qtStage = "true";
@@ -25743,6 +26884,11 @@ void main() {
   var DEFAULT_CAMERA_TARGET = new Vector3(0.8, 2.2, 0);
   var BASE_LINK_PIVOT_MM2 = { x: 118.258, y: 0, z: 0 };
   var TOOL_BALL_STICK_OFFSET_MM = { x: 0, y: 262, z: 0 };
+  var IMPORTED_PATH_LINE_WIDTH_PX = 5;
+  var IMPORTED_REMAINING_PATH_LINE_WIDTH_PX = 2;
+  var IMPORTED_REMAINING_PATH_OPACITY = 0.05;
+  var DEFAULT_IMPORTED_PATH_URL = "assets/paths/cuboid-4000x2700x3300-layer20-y3600-viewXYZ.csv";
+  var DEFAULT_IMPORTED_PATH_NAME = "cuboid-4000x2700x3300-layer20-y3600-viewXYZ.csv";
   var SHOW_BALL_STICK_BASE = false;
   var SHOW_ARM1_ANCHOR_GUIDE = false;
   var ARM1_MODEL_REFERENCE_STATE = { visible: true, x: -3050, y: -135, z: -1590, rx: 0, ry: 0, rz: -90, scale: 1, unitScale: 1 };
@@ -25760,16 +26906,16 @@ void main() {
   var LINK_B1_XP_MODEL_REFERENCE_STATE = { visible: true, x: -3050, y: -135, z: -1590, rx: 0, ry: 0, rz: -90, scale: 1, unitScale: 1 };
   var LINK_B1_XN_MODEL_REFERENCE_STATE = { visible: true, x: -3050, y: -135, z: -1590, rx: 0, ry: 0, rz: -90, scale: 1, unitScale: 1 };
   var LINK_B2_MID_MODEL_REFERENCE_STATE = { visible: true, x: -3050, y: -135, z: -1590, rx: 0, ry: 0, rz: -90, scale: 1, unitScale: 1 };
-  var DEVICE_AXIS_X = new Vector3(1, 0, 0);
-  var DEVICE_AXIS_Y = new Vector3(0, 0, 1);
-  var DEVICE_AXIS_Z = new Vector3(0, 1, 0);
+  var SCENE_AXIS_FOR_DEVICE_X = new Vector3(1, 0, 0);
+  var SCENE_AXIS_FOR_DEVICE_Y = new Vector3(0, 0, 1);
+  var SCENE_AXIS_FOR_DEVICE_Z = new Vector3(0, 1, 0);
   var controlKeys = ["arm1", "arm2", "arm3", "offset", "base"];
   var strokeKeys = ["arm1", "arm2", "arm3"];
   var state = { ...DEFAULT_STATE };
   var driveMode = "angle";
   var currentPose = computePose(state);
   var modelEffect = QT_STAGE_MODE ? "transparent" : "solid";
-  var actuatorBallStickOnly = false;
+  var actuatorBallStickOnly = true;
   var keepToolVertical = true;
   var hasFramedInitialModel = false;
   var arm1ReferencePose = computePose(DEFAULT_STATE);
@@ -25948,29 +27094,31 @@ void main() {
   orbit.target.copy(DEFAULT_CAMERA_TARGET);
   orbit.minDistance = 4;
   orbit.maxDistance = 24;
+  var deviceSceneRoot = new Group();
+  deviceSceneRoot.rotation.y = DEVICE_SCENE_ROTATION_Y_RAD;
+  scene.add(deviceSceneRoot);
   var root = new Group();
-  scene.add(root);
+  deviceSceneRoot.add(root);
   var fixedModelRoot = new Group();
-  scene.add(fixedModelRoot);
+  deviceSceneRoot.add(fixedModelRoot);
   var modelRoot = new Group();
   root.add(modelRoot);
   var ballStickMotionRoot = new Group();
-  scene.add(ballStickMotionRoot);
+  deviceSceneRoot.add(ballStickMotionRoot);
   var ballStickRoot = new Group();
   ballStickMotionRoot.add(ballStickRoot);
   var pathRoot = new Group();
-  scene.add(pathRoot);
+  deviceSceneRoot.add(pathRoot);
   var arm1AnchorGuideRoot = new Group();
-  scene.add(arm1AnchorGuideRoot);
+  deviceSceneRoot.add(arm1AnchorGuideRoot);
   var grid = new GridHelper(11, 11, 4473924, 1907997);
   grid.position.y = -1.2;
-  scene.add(grid);
+  deviceSceneRoot.add(grid);
   var staticGuideRoot = new Group();
-  staticGuideRoot.rotation.y = Math.PI / 2;
-  scene.add(staticGuideRoot);
+  deviceSceneRoot.add(staticGuideRoot);
   createWorldGuides();
   var pivotGuideRoot = new Group();
-  scene.add(pivotGuideRoot);
+  deviceSceneRoot.add(pivotGuideRoot);
   createBaseLinkPivotGuide();
   pivotGuideRoot.visible = false;
   var hemi = new HemisphereLight(16777215, 0, 2.05);
@@ -25995,7 +27143,25 @@ void main() {
     linkage: new MeshStandardMaterial({ color: 13073919, roughness: 0.38, metalness: 0.18 }),
     base: new MeshStandardMaterial({ color: 2830648, roughness: 0.5, metalness: 0.3 }),
     linearHandle: new MeshBasicMaterial({ color: 5213439, transparent: true, opacity: 0.96, depthTest: false }),
-    path: new LineBasicMaterial({ color: 16777215, transparent: true, opacity: 0.85 })
+    path: new LineBasicMaterial({ color: 16777215, transparent: true, opacity: 0.85 }),
+    walkedPath: new LineMaterial({
+      color: 16777215,
+      transparent: true,
+      opacity: 1,
+      linewidth: IMPORTED_PATH_LINE_WIDTH_PX,
+      depthWrite: false
+    }),
+    remainingPath: new LineMaterial({
+      color: 16777215,
+      transparent: true,
+      opacity: IMPORTED_REMAINING_PATH_OPACITY,
+      linewidth: IMPORTED_REMAINING_PATH_LINE_WIDTH_PX,
+      dashed: true,
+      dashSize: 0.12,
+      gapSize: 0.09,
+      depthWrite: false
+    }),
+    importedPathPoint: new MeshBasicMaterial({ color: 10414335, transparent: true, opacity: 0.92, depthTest: false })
   };
   var glbMaterials = {
     transparent: new MeshStandardMaterial({
@@ -26053,6 +27219,10 @@ void main() {
     startWorld: null,
     endWorld: null,
     startState: null,
+    pathPoints: null,
+    pathMode: "interpolated",
+    pathSourceName: "",
+    pathStatus: "\u672A\u5BFC\u5165\u8DEF\u5F84\u6587\u4EF6",
     progress: 0,
     speed: 500,
     animationFrame: null,
@@ -26074,6 +27244,7 @@ void main() {
   var linearDragPlane = new Plane();
   var linearDragIntersection = new Vector3();
   var linearDragHandle = null;
+  var pathRenderStats = { walkedSegments: 0, remainingSegments: 0, mode: "none" };
   var modelControllers = {
     base: makeModelController(
       "base",
@@ -26482,9 +27653,9 @@ void main() {
     return localPoint.clone().sub(basePivot).applyQuaternion(baseQuaternion).add(basePivot);
   }
   function ballStickWorldPoint(point, pose) {
-    const basePivot = toThree(BASE_LINK_PIVOT_MM2);
-    const baseQuaternion = deviceAxisQuaternion(DEVICE_AXIS_Z, degToRad2(pose.baseAngle));
-    return transformedByBaseRotation(toThree(point), basePivot, baseQuaternion);
+    const basePivot = deviceToScene(BASE_LINK_PIVOT_MM2);
+    const baseQuaternion = deviceAxisQuaternion(SCENE_AXIS_FOR_DEVICE_Z, degToRad2(pose.baseAngle));
+    return transformedByBaseRotation(deviceToScene(point), basePivot, baseQuaternion);
   }
   function getActuatorInstance(pose, groupKey, side) {
     const instances = pose.actuators?.[groupKey]?.instances || [];
@@ -26519,8 +27690,8 @@ void main() {
   function frameQuaternionFromAxisAndSide(axis, sideHint) {
     const xAxis = axis.clone().normalize();
     let zAxis = sideHint.clone().sub(xAxis.clone().multiplyScalar(sideHint.dot(xAxis)));
-    if (zAxis.lengthSq() < 1e-10) zAxis = DEVICE_AXIS_Z.clone().sub(xAxis.clone().multiplyScalar(DEVICE_AXIS_Z.dot(xAxis)));
-    if (zAxis.lengthSq() < 1e-10) zAxis = DEVICE_AXIS_X.clone().sub(xAxis.clone().multiplyScalar(DEVICE_AXIS_X.dot(xAxis)));
+    if (zAxis.lengthSq() < 1e-10) zAxis = SCENE_AXIS_FOR_DEVICE_Z.clone().sub(xAxis.clone().multiplyScalar(SCENE_AXIS_FOR_DEVICE_Z.dot(xAxis)));
+    if (zAxis.lengthSq() < 1e-10) zAxis = SCENE_AXIS_FOR_DEVICE_X.clone().sub(xAxis.clone().multiplyScalar(SCENE_AXIS_FOR_DEVICE_X.dot(xAxis)));
     zAxis.normalize();
     const yAxis = zAxis.clone().cross(xAxis).normalize();
     zAxis = xAxis.clone().cross(yAxis).normalize();
@@ -26554,19 +27725,19 @@ void main() {
     controller.model.quaternion.copy(finalQuaternion);
     controller.model.scale.setScalar(scale);
     controller.model.updateWorldMatrix(true, true);
-    const actualAnchorWorld = controller.model.localToWorld(anchorLocalPointForWorld(controller, scale));
+    const actualAnchorWorld = objectLocalToDeviceScene(controller.model, anchorLocalPointForWorld(controller, scale));
     const correction = targetWorld.clone().sub(actualAnchorWorld);
     controller.model.position.add(correction);
     controller.model.updateWorldMatrix(true, true);
-    controller.lastAnchorCorrectionWorld = toWorld(correction);
-    controller.lastModelAnchorWorld = toWorld(controller.model.localToWorld(anchorLocalPointForWorld(controller, scale)));
-    controller.lastTargetAnchorWorld = toWorld(targetWorld);
+    controller.lastAnchorCorrectionWorld = deviceSceneToDevice(correction);
+    controller.lastModelAnchorWorld = deviceSceneToDevice(objectLocalToDeviceScene(controller.model, anchorLocalPointForWorld(controller, scale)));
+    controller.lastTargetAnchorWorld = deviceSceneToDevice(targetWorld);
     controller.lastActuatorFollow = {
       group: follow.group,
       side: follow.side,
       point: follow.point,
-      tailWorld: toWorld(currentTail),
-      frontWorld: toWorld(currentFront)
+      tailWorld: deviceSceneToDevice(currentTail),
+      frontWorld: deviceSceneToDevice(currentFront)
     };
     return true;
   }
@@ -26597,21 +27768,21 @@ void main() {
       controller.model.quaternion.copy(finalQuaternion2);
       controller.model.scale.setScalar(scale);
       controller.model.updateWorldMatrix(true, true);
-      const actualStartWorld = controller.model.localToWorld(controller.twoPointAnchors.start.clone());
-      const actualEndWorld = controller.model.localToWorld(controller.twoPointAnchors.end.clone());
+      const actualStartWorld = objectLocalToDeviceScene(controller.model, controller.twoPointAnchors.start.clone());
+      const actualEndWorld = objectLocalToDeviceScene(controller.model, controller.twoPointAnchors.end.clone());
       controller.lastAnchorCorrectionWorld = { x: 0, y: 0, z: 0 };
-      controller.lastModelAnchorWorld = toWorld(actualStartWorld);
-      controller.lastTargetAnchorWorld = toWorld(currentStart);
+      controller.lastModelAnchorWorld = deviceSceneToDevice(actualStartWorld);
+      controller.lastTargetAnchorWorld = deviceSceneToDevice(currentStart);
       controller.lastLinkageFollow = {
         group: follow.group,
         side: follow.side,
         start: startKey,
         end: endKey,
         point: pointKey2,
-        startWorld: toWorld(currentStart),
-        endWorld: toWorld(currentEnd),
-        actualStartWorld: toWorld(actualStartWorld),
-        actualEndWorld: toWorld(actualEndWorld),
+        startWorld: deviceSceneToDevice(currentStart),
+        endWorld: deviceSceneToDevice(currentEnd),
+        actualStartWorld: deviceSceneToDevice(actualStartWorld),
+        actualEndWorld: deviceSceneToDevice(actualEndWorld),
         startError: Number(actualStartWorld.distanceTo(currentStart).toFixed(6)),
         endError: Number(actualEndWorld.distanceTo(currentEnd).toFixed(6)),
         length: currentStart.distanceTo(currentEnd) / RENDER_SCALE
@@ -26636,21 +27807,21 @@ void main() {
     controller.model.quaternion.copy(finalQuaternion);
     controller.model.scale.setScalar(scale);
     controller.model.updateWorldMatrix(true, true);
-    const actualAnchorWorld = controller.model.localToWorld(anchorLocalPointForWorld(controller, scale));
+    const actualAnchorWorld = objectLocalToDeviceScene(controller.model, anchorLocalPointForWorld(controller, scale));
     const correction = targetWorld.clone().sub(actualAnchorWorld);
     controller.model.position.add(correction);
     controller.model.updateWorldMatrix(true, true);
-    controller.lastAnchorCorrectionWorld = toWorld(correction);
-    controller.lastModelAnchorWorld = toWorld(controller.model.localToWorld(anchorLocalPointForWorld(controller, scale)));
-    controller.lastTargetAnchorWorld = toWorld(targetWorld);
+    controller.lastAnchorCorrectionWorld = deviceSceneToDevice(correction);
+    controller.lastModelAnchorWorld = deviceSceneToDevice(objectLocalToDeviceScene(controller.model, anchorLocalPointForWorld(controller, scale)));
+    controller.lastTargetAnchorWorld = deviceSceneToDevice(targetWorld);
     controller.lastLinkageFollow = {
       group: follow.group,
       side: follow.side,
       start: startKey,
       end: endKey,
       point: pointKey2,
-      startWorld: toWorld(currentStart),
-      endWorld: toWorld(currentEnd),
+      startWorld: deviceSceneToDevice(currentStart),
+      endWorld: deviceSceneToDevice(currentEnd),
       length: currentStart.distanceTo(currentEnd) / RENDER_SCALE
     };
     return true;
@@ -26666,16 +27837,17 @@ void main() {
     return { x: anchor.x, y: anchor.y, z: anchor.z };
   }
   function deviceRotationQuaternion(rx, ry, rz) {
-    const qx = new Quaternion().setFromAxisAngle(DEVICE_AXIS_X, degToRad2(rx));
-    const qy = new Quaternion().setFromAxisAngle(DEVICE_AXIS_Y, degToRad2(ry));
-    const qz = new Quaternion().setFromAxisAngle(DEVICE_AXIS_Z, degToRad2(rz));
+    const qx = new Quaternion().setFromAxisAngle(SCENE_AXIS_FOR_DEVICE_X, degToRad2(rx));
+    const qy = new Quaternion().setFromAxisAngle(SCENE_AXIS_FOR_DEVICE_Y, degToRad2(ry));
+    const qz = new Quaternion().setFromAxisAngle(SCENE_AXIS_FOR_DEVICE_Z, degToRad2(rz));
     return new Quaternion().multiply(qz).multiply(qy).multiply(qx);
   }
   function deviceAxisQuaternion(axis, radians) {
     return new Quaternion().setFromAxisAngle(axis, radians);
   }
-  function toThree(point) {
-    return new Vector3(point.x * RENDER_SCALE, point.z * RENDER_SCALE, (point.y || 0) * RENDER_SCALE);
+  function deviceToScene(point) {
+    const vector = deviceToSceneVectorData(point, RENDER_SCALE);
+    return new Vector3(vector.x, vector.y, vector.z);
   }
   function offsetPoint2(point, offset) {
     return {
@@ -26697,20 +27869,28 @@ void main() {
     const modelQuaternion = deviceRotationQuaternion(modelState.rx, modelState.ry, modelState.rz);
     const inverseModelQuaternion = modelQuaternion.clone().invert();
     const scale = Math.max(1e-3, modelState.scale) * (modelState.unitScale ?? RENDER_SCALE);
-    const toLocalAnchor = (worldPoint) => toThree(worldPoint).sub(modelPosition).applyQuaternion(inverseModelQuaternion).multiplyScalar(1 / scale);
+    const toLocalAnchor = (worldPoint) => deviceToScene(worldPoint).sub(modelPosition).applyQuaternion(inverseModelQuaternion).multiplyScalar(1 / scale);
     return {
       start: toLocalAnchor(startWorld),
       end: toLocalAnchor(endWorld)
     };
   }
   function applyBallStickBaseRotation(baseAngle) {
-    const pivotPosition = toThree(BASE_LINK_PIVOT_MM2);
+    const pivotPosition = deviceToScene(BASE_LINK_PIVOT_MM2);
     ballStickMotionRoot.position.copy(pivotPosition);
     ballStickMotionRoot.rotation.y = degToRad2(baseAngle);
     ballStickRoot.position.copy(pivotPosition).multiplyScalar(-1);
   }
-  function toWorld(vector) {
-    return { x: vector.x / RENDER_SCALE, y: vector.z / RENDER_SCALE, z: vector.y / RENDER_SCALE };
+  function sceneToDevice(vector) {
+    const deviceSceneVector = deviceSceneRoot.worldToLocal(vector.clone());
+    return sceneToDevicePointData(deviceSceneVector, RENDER_SCALE);
+  }
+  function deviceSceneToDevice(vector) {
+    return sceneToDevicePointData(vector, RENDER_SCALE);
+  }
+  function objectLocalToDeviceScene(object, localPoint) {
+    object.updateWorldMatrix(true, false);
+    return deviceSceneRoot.worldToLocal(object.localToWorld(localPoint.clone()));
   }
   function roundedWorldPoint(point) {
     return {
@@ -26731,13 +27911,13 @@ void main() {
   }
   function makeSphere(point, radius, material, parent = ballStickRoot) {
     const mesh = new Mesh(new SphereGeometry(radius, 28, 16), material);
-    mesh.position.copy(toThree(point));
+    mesh.position.copy(deviceToScene(point));
     parent.add(mesh);
     return mesh;
   }
   function makeRod(start, end, radius, material, parent = ballStickRoot) {
-    const startVector = toThree(start);
-    const endVector = toThree(end);
+    const startVector = deviceToScene(start);
+    const endVector = deviceToScene(end);
     const direction = endVector.clone().sub(startVector);
     const length = direction.length();
     const mesh = new Mesh(new CylinderGeometry(radius, radius, Math.max(length, 1e-4), 18), material);
@@ -26747,8 +27927,8 @@ void main() {
     return mesh;
   }
   function makeGuideRod(startPoint, endPoint, radius, material, parent = staticGuideRoot) {
-    const start = toThree(startPoint);
-    const end = toThree(endPoint);
+    const start = deviceToScene(startPoint);
+    const end = deviceToScene(endPoint);
     const direction = end.clone().sub(start);
     const length = direction.length();
     const mesh = new Mesh(new CylinderGeometry(radius, radius, Math.max(length, 1e-4), 18), material);
@@ -26777,8 +27957,8 @@ void main() {
   function axisArrow(start, end, color, label) {
     const group = new Group();
     const material = new MeshBasicMaterial({ color, transparent: true, opacity: 0.95 });
-    const startVector = toThree(start);
-    const endVector = toThree(end);
+    const startVector = deviceToScene(start);
+    const endVector = deviceToScene(end);
     makeGuideRod(start, end, 0.026, material, group);
     const direction = endVector.clone().sub(startVector).normalize();
     const cone = new Mesh(new ConeGeometry(0.14, 0.42, 28), material);
@@ -26808,13 +27988,13 @@ void main() {
     staticGuideRoot.add(axisArrow({ x: 0, y: 0, z: 0 }, { x: 0, y: axisLength, z: 0 }, 7383039, "Y+"));
     staticGuideRoot.add(axisArrow({ x: 0, y: 0, z: 0 }, { x: 0, y: 0, z: axisLength }, 4969381, "Z+"));
     staticGuideRoot.add(axisTicks());
-    staticGuideRoot.add(makeTextSprite("GL-3DPRT-SP-S", toThree({ x: -5200, y: 4900, z: 40 }), 16250352, 1.25));
+    staticGuideRoot.add(makeTextSprite("GL-3DPRT-SP-S", deviceToScene({ x: -5200, y: 4900, z: 40 }), 16250352, 1.25));
   }
   function createBaseLinkPivotGuide() {
     const pivotMaterial = new MeshBasicMaterial({ color: 16766011, transparent: true, opacity: 0.98, depthTest: false });
     const crossMaterial = new MeshBasicMaterial({ color: 16732120, transparent: true, opacity: 0.88, depthTest: false });
     const ringMaterial = new MeshBasicMaterial({ color: 16766011, transparent: true, opacity: 0.55, side: DoubleSide, depthTest: false });
-    const pivotPosition = toThree(BASE_LINK_PIVOT_MM2);
+    const pivotPosition = deviceToScene(BASE_LINK_PIVOT_MM2);
     const pivot = new Mesh(new SphereGeometry(0.13, 32, 18), pivotMaterial);
     pivot.position.copy(pivotPosition);
     pivot.renderOrder = 20;
@@ -26908,6 +28088,7 @@ void main() {
   }
   function createStrokeControl(key) {
     const label = ACTUATOR_GROUPS[key].label;
+    const strokeLimit = ACTUATOR_STROKE_LIMITS[key];
     const wrapper = document.createElement("section");
     wrapper.className = "control";
     wrapper.innerHTML = `
@@ -26919,7 +28100,7 @@ void main() {
       <input id="${key}Stroke" type="range" min="0" max="100" step="1" value="0" />
       <input class="number-input" id="${key}StrokeNumber" type="number" min="0" max="100" step="1" value="0" aria-label="${label}" />
     </div>
-    <div class="minmax"><span>\u6536\u56DE</span><span>\u4F38\u51FA</span></div>
+    <div class="minmax"><span>${strokeLimit.minLength.toFixed(1)} mm</span><span>${strokeLimit.maxLength.toFixed(1)} mm</span></div>
   `;
     strokeRoot.appendChild(wrapper);
     const sync = (value) => {
@@ -26986,6 +28167,26 @@ void main() {
       <label>\u9884\u8BA1\u65F6\u95F4 <output id="linearDurationEstimate">0.0 s</output></label>
       <label>\u6C42\u89E3\u8BEF\u5DEE <output id="linearSolveError">0 mm</output></label>
     </div>
+    <div class="linear-import-panel">
+      <div class="linear-import-head">
+        <strong>\u8DEF\u5F84\u5BFC\u5165</strong>
+        <label class="linear-file-button">
+          <span>CSV / JSON</span>
+          <input id="linearPathFile" type="file" accept=".csv,.json,text/csv,application/json" />
+        </label>
+      </div>
+      <p class="coordinate-note">${COORDINATE_SYSTEM_NOTE}</p>
+      <div class="linear-grid">
+        <label>\u8DEF\u5F84\u6A21\u5F0F
+          <select id="linearPathMode">
+            <option value="interpolated">\u6298\u7EBF\u63D2\u503C</option>
+            <option value="points">\u8DEF\u5F84\u70B9\u6B65\u8FDB</option>
+          </select>
+        </label>
+        <label>\u6A21\u62DF\u70B9\u6570 <output id="linearPathPointCount">0</output></label>
+      </div>
+      <output id="linearPathStatus" class="linear-path-status">${linearMotion.pathStatus}</output>
+    </div>
     <div class="range-line">
       <input id="linearProgress" type="range" min="0" max="100" step="1" value="0" />
       <input class="number-input" id="linearProgressNumber" type="number" min="0" max="100" step="1" value="0" aria-label="\u7EBF\u6027\u8FDB\u5EA6" />
@@ -26993,6 +28194,7 @@ void main() {
     <div class="linear-actions">
       <button id="setLinearStart" type="button">\u5F53\u524D\u8BBE\u4E3A\u8D77\u70B9</button>
       <button id="setLinearEnd" type="button">\u5F53\u524D\u8BBE\u4E3A\u7EC8\u70B9</button>
+      <button id="clearLinearPath" type="button">\u6E05\u9664\u5BFC\u5165\u8DEF\u5F84</button>
       <button id="simulateLinearMotion" type="button">\u6A21\u62DF</button>
     </div>
   `;
@@ -27013,18 +28215,95 @@ void main() {
       event.target.value = linearMotion.speed;
       syncLinearReadouts();
     });
+    document.querySelector("#linearPathMode").addEventListener("change", (event) => {
+      stopLinearSimulation();
+      linearMotion.pathMode = event.target.value === "points" ? "points" : "interpolated";
+      runLinearMotion();
+    });
+    document.querySelector("#linearPathFile").addEventListener("change", onLinearPathFileSelected);
     document.querySelector("#linearProgress").addEventListener("input", (event) => setLinearProgress(event.target.value));
     document.querySelector("#linearProgressNumber").addEventListener("change", (event) => setLinearProgress(event.target.value));
     document.querySelector("#setLinearStart").addEventListener("click", () => setLinearPoint("startWorld", currentTipWorld()));
     document.querySelector("#setLinearEnd").addEventListener("click", () => setLinearPoint("endWorld", currentTipWorld()));
+    document.querySelector("#clearLinearPath").addEventListener("click", clearImportedLinearPath);
     document.querySelector("#simulateLinearMotion").addEventListener("click", startLinearSimulation);
     syncLinearReadouts();
   }
   function currentTipWorld() {
     return roundedWorldPoint(worldDisplayedToolPointForState(state, TOOL_BALL_STICK_OFFSET_MM));
   }
+  function verticalPoseState() {
+    return clampState(applyPreset("calibration", DEFAULT_STATE));
+  }
+  function verticalPoseToolWorld() {
+    return roundedWorldPoint(worldDisplayedToolPointForState(verticalPoseState(), TOOL_BALL_STICK_OFFSET_MM));
+  }
+  function importedLinearPathActive() {
+    return Array.isArray(linearMotion.pathPoints) && linearMotion.pathPoints.length >= 2;
+  }
+  function activeLinearPathPoints() {
+    if (importedLinearPathActive()) return linearMotion.pathPoints;
+    return [linearMotion.startWorld, linearMotion.endWorld].filter(Boolean);
+  }
+  function segmentDistance(a, b) {
+    return a && b ? distance(a, b) : 0;
+  }
   function linearPathDistance() {
-    return distance(linearMotion.startWorld, linearMotion.endWorld);
+    return pathDistanceForPoints(activeLinearPathPoints());
+  }
+  function pathDistanceForPoints(points) {
+    let total = 0;
+    for (let index = 1; index < points.length; index += 1) {
+      total += segmentDistance(points[index - 1], points[index]);
+    }
+    return total;
+  }
+  function splitPathAtProgress(points, progress) {
+    if (points.length < 2) return { walked: points.slice(), remaining: [], walkedDistance: 0 };
+    const total = pathDistanceForPoints(points);
+    if (total < 1e-3) return { walked: [points[0]], remaining: points.slice(), walkedDistance: 0 };
+    const targetDistance = total * clamp2(progress / 100, 0, 1);
+    let remainingDistance = total * clamp2(progress / 100, 0, 1);
+    let walkedDistance = 0;
+    const walked = [points[0]];
+    for (let index = 1; index < points.length; index += 1) {
+      const start = points[index - 1];
+      const end = points[index];
+      const length = segmentDistance(start, end);
+      if (remainingDistance >= length) {
+        walked.push(end);
+        remainingDistance -= length;
+        walkedDistance += length;
+        continue;
+      }
+      const localT = length < 1e-3 ? 0 : clamp2(remainingDistance / length, 0, 1);
+      const current = roundedWorldPoint({
+        x: start.x + (end.x - start.x) * localT,
+        y: start.y + (end.y - start.y) * localT,
+        z: start.z + (end.z - start.z) * localT
+      });
+      if (segmentDistance(walked[walked.length - 1], current) > 1e-3) walked.push(current);
+      walkedDistance += length * localT;
+      return { walked, remaining: [current, ...points.slice(index)], walkedDistance: Math.min(walkedDistance, targetDistance) };
+    }
+    return { walked, remaining: [points[points.length - 1]], walkedDistance: total };
+  }
+  function addPathLine(points, material, name, dashed = false) {
+    if (points.length < 2) return 0;
+    const vectors = points.map((point) => deviceToScene(point));
+    let line;
+    if (material.isLineMaterial) {
+      const geometry = new LineGeometry();
+      geometry.setPositions(vectors.flatMap((vector) => [vector.x, vector.y, vector.z]));
+      line = new Line2(geometry, material);
+    } else {
+      const geometry = new BufferGeometry().setFromPoints(vectors);
+      line = new Line(geometry, material);
+    }
+    line.name = name;
+    if (dashed) line.computeLineDistances();
+    pathRoot.add(line);
+    return points.length - 1;
   }
   function syncLinearPointInputs(kind) {
     const point = linearMotion[kind];
@@ -27043,26 +28322,172 @@ void main() {
     document.querySelector("#linearDurationEstimate").value = `${(linearPathDistance() / linearMotion.speed).toFixed(1)} s`;
     document.querySelector("#linearSolveError").value = `${error.toFixed(1)} mm`;
     document.querySelector("#simulateLinearMotion").textContent = linearMotion.isSimulating ? "\u505C\u6B62" : "\u6A21\u62DF";
+    const modeSelect = document.querySelector("#linearPathMode");
+    if (modeSelect) modeSelect.value = linearMotion.pathMode;
+    const countOutput = document.querySelector("#linearPathPointCount");
+    if (countOutput) countOutput.value = importedLinearPathActive() ? String(linearMotion.pathPoints.length) : "0";
+    const statusOutput = document.querySelector("#linearPathStatus");
+    if (statusOutput) statusOutput.value = linearMotion.pathStatus;
     drawLinearPath();
   }
   function setLinearPoint(kind, point) {
+    if (importedLinearPathActive()) {
+      linearMotion.pathPoints = null;
+      linearMotion.pathSourceName = "";
+      linearMotion.pathStatus = "\u5DF2\u5207\u56DE\u624B\u52A8\u8D77\u7EC8\u70B9\u8DEF\u5F84";
+    }
     linearMotion[kind] = roundedWorldPoint(point);
     if (kind === "startWorld") linearMotion.startState = { ...state };
     syncLinearPointInputs(kind);
     syncLinearReadouts();
   }
-  function linearTargetFromProgress() {
-    const t = clamp2(linearMotion.progress / 100, 0, 1);
-    return {
-      x: linearMotion.startWorld.x + (linearMotion.endWorld.x - linearMotion.startWorld.x) * t,
-      y: linearMotion.startWorld.y + (linearMotion.endWorld.y - linearMotion.startWorld.y) * t,
-      z: linearMotion.startWorld.z + (linearMotion.endWorld.z - linearMotion.startWorld.z) * t
+  function normalizePathPoint(rawPoint, index = 0) {
+    let point;
+    if (Array.isArray(rawPoint)) {
+      point = { x: rawPoint[0], y: rawPoint[1], z: rawPoint[2] };
+    } else if (rawPoint && typeof rawPoint === "object") {
+      point = {
+        x: rawPoint.x ?? rawPoint.X,
+        y: rawPoint.y ?? rawPoint.Y,
+        z: rawPoint.z ?? rawPoint.Z
+      };
+    }
+    const normalized = {
+      x: Number(point?.x),
+      y: Number(point?.y),
+      z: Number(point?.z)
     };
+    if (!Number.isFinite(normalized.x) || !Number.isFinite(normalized.y) || !Number.isFinite(normalized.z)) {
+      throw new Error(`\u7B2C ${index + 1} \u4E2A\u8DEF\u5F84\u70B9\u7F3A\u5C11\u6709\u6548 X/Y/Z`);
+    }
+    return roundedWorldPoint(normalized);
+  }
+  function parseJsonPathPoints(text) {
+    const payload = JSON.parse(text);
+    const rows = Array.isArray(payload) ? payload : payload.points ?? payload.path ?? payload.positions;
+    if (!Array.isArray(rows)) throw new Error("JSON \u9700\u8981\u662F\u70B9\u6570\u7EC4\uFF0C\u6216\u5305\u542B points/path/positions \u6570\u7EC4");
+    return rows.map((row, index) => normalizePathPoint(row, index));
+  }
+  function splitCsvLine(line) {
+    return line.trim().split(/[,\t; ]+/).map((cell) => cell.trim()).filter(Boolean);
+  }
+  function parseCsvPathPoints(text) {
+    const lines = text.split(/\r?\n/).map((line) => line.trim()).filter((line) => line && !line.startsWith("#"));
+    if (!lines.length) return [];
+    const first = splitCsvLine(lines[0]);
+    const hasHeader = first.some((cell) => Number.isNaN(Number(cell)));
+    const header = hasHeader ? first.map((cell) => cell.toLowerCase()) : ["x", "y", "z"];
+    const xIndex = header.indexOf("x");
+    const yIndex = header.indexOf("y");
+    const zIndex = header.indexOf("z");
+    if (xIndex < 0 || yIndex < 0 || zIndex < 0) throw new Error("CSV \u8868\u5934\u9700\u8981\u5305\u542B x,y,z");
+    const dataLines = hasHeader ? lines.slice(1) : lines;
+    return dataLines.map((line, index) => {
+      const cells = splitCsvLine(line);
+      return normalizePathPoint({ x: cells[xIndex], y: cells[yIndex], z: cells[zIndex] }, index);
+    });
+  }
+  function uniqueAdjacentPathPoints(points) {
+    return points.filter((point, index) => index === 0 || segmentDistance(points[index - 1], point) > 1e-3);
+  }
+  function applyImportedLinearPath(points, sourceName = "") {
+    const cleanPoints = uniqueAdjacentPathPoints(points);
+    if (cleanPoints.length < 2) throw new Error("\u8DEF\u5F84\u81F3\u5C11\u9700\u8981 2 \u4E2A\u4E0D\u540C\u70B9");
+    const simulationPoints = uniqueAdjacentPathPoints([verticalPoseToolWorld(), ...cleanPoints]);
+    stopLinearSimulation();
+    linearMotion.pathPoints = simulationPoints;
+    linearMotion.pathSourceName = sourceName;
+    linearMotion.pathStatus = `\u5DF2\u5BFC\u5165 ${cleanPoints.length} \u70B9\uFF0C\u6A21\u62DF\u8DEF\u5F84 ${simulationPoints.length} \u70B9${sourceName ? ` \xB7 ${sourceName}` : ""}`;
+    linearMotion.startWorld = roundedWorldPoint(simulationPoints[0]);
+    linearMotion.endWorld = roundedWorldPoint(simulationPoints[simulationPoints.length - 1]);
+    linearMotion.startState = verticalPoseState();
+    linearMotion.progress = 0;
+    syncLinearPointInputs("startWorld");
+    syncLinearPointInputs("endWorld");
+    runLinearMotion({ resetToStartState: true });
+  }
+  function parseLinearPathFile(file, text) {
+    const name = file?.name || "";
+    if (/\.json$/i.test(name) || /^\s*[\[{]/.test(text)) return parseJsonPathPoints(text);
+    return parseCsvPathPoints(text);
+  }
+  async function onLinearPathFileSelected(event) {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    try {
+      const text = await file.text();
+      applyImportedLinearPath(parseLinearPathFile(file, text), file.name);
+    } catch (error) {
+      stopLinearSimulation();
+      linearMotion.pathStatus = `\u5BFC\u5165\u5931\u8D25\uFF1A${error?.message || error}`;
+      syncLinearReadouts();
+    } finally {
+      event.target.value = "";
+    }
+  }
+  async function loadDefaultImportedLinearPath() {
+    try {
+      setDriveMode("linear");
+      const response = await fetch(DEFAULT_IMPORTED_PATH_URL);
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      const text = await response.text();
+      applyImportedLinearPath(parseCsvPathPoints(text), DEFAULT_IMPORTED_PATH_NAME);
+    } catch (error) {
+      linearMotion.pathStatus = `\u9ED8\u8BA4\u8DEF\u5F84\u5BFC\u5165\u5931\u8D25\uFF1A${error?.message || error}`;
+      syncLinearReadouts();
+    }
+  }
+  function clearImportedLinearPath() {
+    stopLinearSimulation();
+    linearMotion.pathPoints = null;
+    linearMotion.pathSourceName = "";
+    linearMotion.pathStatus = "\u672A\u5BFC\u5165\u8DEF\u5F84\u6587\u4EF6";
+    linearMotion.progress = 0;
+    syncLinearReadouts();
+    runLinearMotion();
+  }
+  function pointAtLinearProgress(points, progress) {
+    if (!points.length) return currentTipWorld();
+    if (points.length === 1) return roundedWorldPoint(points[0]);
+    const t = clamp2(progress / 100, 0, 1);
+    if (linearMotion.pathMode === "points") {
+      const index = clamp2(Math.round(t * (points.length - 1)), 0, points.length - 1);
+      return roundedWorldPoint(points[index]);
+    }
+    const total = linearPathDistance();
+    if (total < 1e-3) return roundedWorldPoint(points[0]);
+    let remaining = total * t;
+    for (let index = 1; index < points.length; index += 1) {
+      const start = points[index - 1];
+      const end = points[index];
+      const length = segmentDistance(start, end);
+      if (remaining <= length || index === points.length - 1) {
+        const localT = length < 1e-3 ? 0 : clamp2(remaining / length, 0, 1);
+        return roundedWorldPoint({
+          x: start.x + (end.x - start.x) * localT,
+          y: start.y + (end.y - start.y) * localT,
+          z: start.z + (end.z - start.z) * localT
+        });
+      }
+      remaining -= length;
+    }
+    return roundedWorldPoint(points[points.length - 1]);
+  }
+  function linearTargetFromProgress() {
+    return pointAtLinearProgress(activeLinearPathPoints(), linearMotion.progress);
   }
   function displayedLinearTargetFromProgress() {
     return linearTargetFromProgress();
   }
-  function runLinearMotion() {
+  function runLinearMotion({ resetToStartState = false } = {}) {
+    if (resetToStartState && linearMotion.startState) {
+      Object.assign(state, clampState(linearMotion.startState));
+    }
+    if (importedLinearPathActive() && linearMotion.startState && linearMotion.progress <= 1e-3) {
+      Object.assign(state, clampState(linearMotion.startState));
+      update(0);
+      return;
+    }
     const solved = solveStateForWorldDisplayedToolTarget(linearTargetFromProgress(), state, TOOL_BALL_STICK_OFFSET_MM);
     Object.assign(state, solved.state);
     applyToolVerticalConstraint();
@@ -27071,7 +28496,7 @@ void main() {
   function setLinearProgress(value) {
     stopLinearSimulation();
     linearMotion.progress = clamp2(Number(value), 0, 100);
-    runLinearMotion();
+    runLinearMotion({ resetToStartState: importedLinearPathActive() });
   }
   function stopLinearSimulation() {
     if (linearMotion.animationFrame) cancelAnimationFrame(linearMotion.animationFrame);
@@ -27089,6 +28514,7 @@ void main() {
     if (pathDistance < 1e-3) return;
     if (linearMotion.startState) Object.assign(state, clampState(linearMotion.startState));
     linearMotion.progress = 0;
+    runLinearMotion();
     linearMotion.startedAt = performance.now();
     linearMotion.isSimulating = true;
     const durationMs = Math.max(1, pathDistance / linearMotion.speed * 1e3);
@@ -27107,11 +28533,42 @@ void main() {
   function drawLinearPath() {
     clearGroup(pathRoot);
     linearDragHandle = null;
-    if (!linearMotion.startWorld || !linearMotion.endWorld) return;
-    const geometry = new BufferGeometry().setFromPoints([toThree(linearMotion.startWorld), toThree(linearMotion.endWorld)]);
-    pathRoot.add(new Line(geometry, materials.path));
-    makeSphere(linearMotion.startWorld, 0.055, materials.joint, pathRoot);
-    makeSphere(linearMotion.endWorld, 0.055, materials.tool, pathRoot);
+    pathRenderStats = { walkedSegments: 0, remainingSegments: 0, mode: "none" };
+    const points = activeLinearPathPoints();
+    if (points.length < 2) return;
+    if (importedLinearPathActive()) {
+      const split = splitPathAtProgress(points, linearMotion.progress);
+      const remainingDashOffset = split.walkedDistance * RENDER_SCALE;
+      materials.remainingPath.dashOffset = remainingDashOffset;
+      pathRenderStats = {
+        walkedSegments: addPathLine(split.walked, materials.walkedPath, "walkedPath", false),
+        remainingSegments: addPathLine(split.remaining, materials.remainingPath, "remainingPath", true),
+        mode: "progress",
+        lineRenderer: "fat-line",
+        lineWidthPx: IMPORTED_PATH_LINE_WIDTH_PX,
+        remainingLineWidthPx: IMPORTED_REMAINING_PATH_LINE_WIDTH_PX,
+        remainingOpacity: IMPORTED_REMAINING_PATH_OPACITY,
+        remainingDashOffset
+      };
+    } else {
+      pathRenderStats = {
+        walkedSegments: addPathLine(points, materials.path, "manualPath", false),
+        remainingSegments: 0,
+        mode: "manual",
+        lineRenderer: "thin-line",
+        lineWidthPx: 1
+      };
+    }
+    if (importedLinearPathActive()) {
+      pathRenderStats.pointMarkers = 0;
+      return;
+    }
+    points.forEach((point, index) => {
+      makeSphere(point, index === 0 || index === points.length - 1 ? 0.055 : 0.032, materials.joint, pathRoot);
+    });
+    makeSphere(points[0], 0.06, materials.joint, pathRoot);
+    makeSphere(points[points.length - 1], 0.06, materials.tool, pathRoot);
+    pathRenderStats.pointMarkers = points.length + 2;
   }
   function updatePointerNdc(event) {
     const rect = renderer.domElement.getBoundingClientRect();
@@ -27121,10 +28578,10 @@ void main() {
   function scenePointForDisplayedTool(point) {
     ballStickMotionRoot.updateWorldMatrix(true, true);
     ballStickRoot.updateWorldMatrix(true, true);
-    return ballStickRoot.localToWorld(toThree(point));
+    return ballStickRoot.localToWorld(deviceToScene(point));
   }
   function worldPointFromScene(scenePoint) {
-    return roundedWorldPoint(toWorld(scenePoint));
+    return roundedWorldPoint(sceneToDevice(scenePoint));
   }
   function updateTipDragHandle(pose) {
     const scenePoint = scenePointForDisplayedTool(displayedToolPoint(pose.toolCenter));
@@ -27147,6 +28604,11 @@ void main() {
   function setLinearDraggedTarget(worldPoint) {
     if (!linearMotion.startWorld) return;
     stopLinearSimulation();
+    if (importedLinearPathActive()) {
+      linearMotion.pathPoints = null;
+      linearMotion.pathSourceName = "";
+      linearMotion.pathStatus = "\u5DF2\u5207\u56DE\u62D6\u62FD\u7EC8\u70B9\u8DEF\u5F84";
+    }
     const targetWorld = roundedWorldPoint(worldPoint);
     const solved = solveStateForWorldDisplayedToolTarget(targetWorld, state, TOOL_BALL_STICK_OFFSET_MM);
     Object.assign(state, solved.state);
@@ -27280,7 +28742,9 @@ void main() {
     document.querySelector("#totalAxisLength").textContent = `${pose.totalAxisDistance.toFixed(3)} mm`;
     strokeKeys.forEach((key) => {
       const actuator = pose.actuators[key];
-      document.querySelector(`#${key}Actuator`).textContent = `${actuator.instances[0].length.toFixed(1)} mm \xB7 ${actuator.count} \u6839`;
+      const strokeText = `${Math.round(actuator.stroke * 100)}%`;
+      const stateText = actuator.withinStroke ? "" : " \xB7 \u8D8A\u754C";
+      document.querySelector(`#${key}Actuator`).textContent = `${actuator.instances[0].length.toFixed(1)} mm \xB7 ${strokeText} \xB7 ${actuator.count} \u6839${stateText}`;
     });
     document.querySelector("#jointReadout").textContent = pose.joints.map((joint) => formatPoint(joint, 1)).join(" | ");
     document.querySelector("#linkAReadout").textContent = `${pose.linkages.A.instances[0].link1Length.toFixed(1)} / ${pose.linkages.A.instances[0].link2Length.toFixed(1)} mm`;
@@ -27291,7 +28755,7 @@ void main() {
     applyBallStickBaseRotation(pose.baseAngle);
     if (!actuatorBallStickOnly && SHOW_BALL_STICK_BASE) {
       const base = new Mesh(new CylinderGeometry(0.46, 0.58, 0.22, 42), materials.base);
-      base.position.copy(toThree({ x: JOINTS.baseArm1.x, y: 0, z: 0 }));
+      base.position.copy(deviceToScene({ x: JOINTS.baseArm1.x, y: 0, z: 0 }));
       ballStickRoot.add(base);
     }
     if (!actuatorBallStickOnly) {
@@ -27499,7 +28963,7 @@ void main() {
     const s = controller.state;
     controller.group.visible = s.visible;
     const basePosition = new Vector3(s.x * RENDER_SCALE, s.z * RENDER_SCALE, s.y * RENDER_SCALE);
-    const pivotPosition = toThree(controller.pivotPoint);
+    const pivotPosition = deviceToScene(controller.pivotPoint);
     const target = controller.pivot === "origin" ? controller.model : controller.group;
     controller.group.position.copy(controller.pivot === "origin" ? pivotPosition : new Vector3(0, 0, 0));
     controller.group.rotation.set(0, 0, 0);
@@ -27517,7 +28981,7 @@ void main() {
         controller.group.rotation.y = angleDelta;
       } else {
         target.position.applyAxisAngle(new Vector3(0, 1, 0), angleDelta);
-        target.quaternion.premultiply(deviceAxisQuaternion(DEVICE_AXIS_Z, angleDelta));
+        target.quaternion.premultiply(deviceAxisQuaternion(SCENE_AXIS_FOR_DEVICE_Z, angleDelta));
       }
     }
     if (controller.actuatorFollow) {
@@ -27533,11 +28997,11 @@ void main() {
       const anchor = follows === "tool" ? segment.start : segment.start;
       if (controller.referencePoseFollow) {
         const baseAngleDelta = degToRad2(pose.baseAngle - DEFAULT_STATE.base);
-        const baseQuaternion = deviceAxisQuaternion(DEVICE_AXIS_Z, baseAngleDelta);
+        const baseQuaternion = deviceAxisQuaternion(SCENE_AXIS_FOR_DEVICE_Z, baseAngleDelta);
         const modelQuaternion = deviceRotationQuaternion(s.rx, s.ry, s.rz);
         const referenceAngle = controller.followReferenceAngle ?? DEFAULT_STATE[follows] ?? 0;
         const angleDelta = degToRad2((segment.angle - referenceAngle) * controller.jointRotationSign);
-        const localQuaternion = deviceAxisQuaternion(DEVICE_AXIS_Y, angleDelta).multiply(modelQuaternion);
+        const localQuaternion = deviceAxisQuaternion(SCENE_AXIS_FOR_DEVICE_Y, angleDelta).multiply(modelQuaternion);
         const finalQuaternion = baseQuaternion.clone().multiply(localQuaternion);
         const targetWorld = ballStickWorldPoint(anchor, pose);
         const rootOffset = anchorOffsetVector(controller, finalQuaternion, scale);
@@ -27548,20 +29012,20 @@ void main() {
         controller.model.quaternion.copy(finalQuaternion);
         controller.model.scale.setScalar(scale);
         controller.model.updateWorldMatrix(true, true);
-        const actualAnchorWorld = controller.model.localToWorld(anchorLocalPointForWorld(controller, scale));
+        const actualAnchorWorld = objectLocalToDeviceScene(controller.model, anchorLocalPointForWorld(controller, scale));
         const correction = targetWorld.clone().sub(actualAnchorWorld);
         controller.model.position.add(correction);
         controller.model.updateWorldMatrix(true, true);
-        controller.lastAnchorCorrectionWorld = toWorld(correction);
-        controller.lastModelAnchorWorld = toWorld(controller.model.localToWorld(anchorLocalPointForWorld(controller, scale)));
-        controller.lastTargetAnchorWorld = toWorld(targetWorld);
+        controller.lastAnchorCorrectionWorld = deviceSceneToDevice(correction);
+        controller.lastModelAnchorWorld = deviceSceneToDevice(objectLocalToDeviceScene(controller.model, anchorLocalPointForWorld(controller, scale)));
+        controller.lastTargetAnchorWorld = deviceSceneToDevice(targetWorld);
         return;
       }
       if (controller.twoPointAnchors && !controller.editAnchorsOnly) {
-        const basePivot = toThree(BASE_LINK_PIVOT_MM2);
+        const basePivot = deviceToScene(BASE_LINK_PIVOT_MM2);
         const baseAngleDelta = degToRad2(pose.baseAngle - DEFAULT_STATE.base);
-        const startPosition = toThree(segment.start);
-        const endPosition = toThree(segment.end);
+        const startPosition = deviceToScene(segment.start);
+        const endPosition = deviceToScene(segment.end);
         const modelQuaternion = deviceRotationQuaternion(s.rx, s.ry, s.rz);
         const scale2 = Math.max(1e-3, s.scale) * (s.unitScale ?? RENDER_SCALE);
         const localStart = controller.twoPointAnchors.start.clone();
@@ -27572,7 +29036,7 @@ void main() {
         const finalQuaternion = alignQuaternion.multiply(modelQuaternion);
         const startOffset = localStart.multiplyScalar(scale2).applyQuaternion(finalQuaternion);
         controller.group.position.copy(basePivot);
-        controller.group.quaternion.copy(deviceAxisQuaternion(DEVICE_AXIS_Z, baseAngleDelta));
+        controller.group.quaternion.copy(deviceAxisQuaternion(SCENE_AXIS_FOR_DEVICE_Z, baseAngleDelta));
         controller.group.scale.setScalar(1);
         controller.model.position.copy(startPosition.sub(basePivot).sub(startOffset));
         controller.model.quaternion.copy(finalQuaternion);
@@ -27585,7 +29049,7 @@ void main() {
         const referenceOffset = basePosition.clone().sub(anchorPosition);
         const modelQuaternion = deviceRotationQuaternion(s.rx, s.ry, s.rz);
         controller.group.position.copy(anchorPosition);
-        controller.group.quaternion.copy(deviceAxisQuaternion(DEVICE_AXIS_Y, angleDelta));
+        controller.group.quaternion.copy(deviceAxisQuaternion(SCENE_AXIS_FOR_DEVICE_Y, angleDelta));
         controller.group.scale.setScalar(1);
         if (controller.anchorLocal) {
           const anchorOffset = anchorOffsetVector(controller, modelQuaternion, scale);
@@ -27597,7 +29061,7 @@ void main() {
         controller.model.scale.setScalar(scale);
       } else {
         target.position.add(anchorPosition);
-        target.quaternion.premultiply(deviceAxisQuaternion(DEVICE_AXIS_Z, degToRad2(segment.angle)));
+        target.quaternion.premultiply(deviceAxisQuaternion(SCENE_AXIS_FOR_DEVICE_Z, degToRad2(segment.angle)));
       }
     }
   }
@@ -27656,8 +29120,8 @@ void main() {
     }
     ballStickMotionRoot.updateWorldMatrix(true, true);
     ballStickRoot.updateWorldMatrix(true, true);
-    const start = ballStickRoot.localToWorld(toThree(segment.start));
-    const end = ballStickRoot.localToWorld(toThree(segment.end));
+    const start = objectLocalToDeviceScene(ballStickRoot, deviceToScene(segment.start));
+    const end = objectLocalToDeviceScene(ballStickRoot, deviceToScene(segment.end));
     arm1AnchorGuideRoot.visible = true;
     arm1AnchorGuide.start.position.copy(start);
     arm1AnchorGuide.end.position.copy(end);
@@ -27665,15 +29129,15 @@ void main() {
     if (controller.anchorLocal) {
       controller.model.updateWorldMatrix(true, true);
       const scale = Math.max(1e-3, controller.state.scale) * (controller.state.unitScale ?? RENDER_SCALE);
-      const modelAnchor = controller.model.localToWorld(anchorLocalPointForWorld(controller, scale));
+      const modelAnchor = objectLocalToDeviceScene(controller.model, anchorLocalPointForWorld(controller, scale));
       arm1AnchorGuide.modelAnchor.visible = true;
       arm1AnchorGuide.modelAnchor.position.copy(modelAnchor);
-      controller.lastModelAnchorWorld = toWorld(modelAnchor);
-      controller.lastTargetAnchorWorld = toWorld(start);
+      controller.lastModelAnchorWorld = deviceSceneToDevice(modelAnchor);
+      controller.lastTargetAnchorWorld = deviceSceneToDevice(start);
     } else {
       arm1AnchorGuide.modelAnchor.visible = false;
       controller.lastModelAnchorWorld = null;
-      controller.lastTargetAnchorWorld = toWorld(start);
+      controller.lastTargetAnchorWorld = deviceSceneToDevice(start);
     }
   }
   function setViewMode(mode) {
@@ -27696,9 +29160,9 @@ void main() {
     applyToolVerticalConstraint();
     currentPose = computePose(state);
     controlKeys.forEach((key) => setControlValue(key, currentPose[key]));
-    setStrokeValue("arm1", currentPose.arm1 / LIMITS.arm1.max);
-    setStrokeValue("arm2", 1 - currentPose.arm2 / LIMITS.arm2.max);
-    setStrokeValue("arm3", 1 - currentPose.arm3 / LIMITS.arm3.max);
+    setStrokeValue("arm1", currentPose.actuators.arm1.stroke);
+    setStrokeValue("arm2", currentPose.actuators.arm2.stroke);
+    setStrokeValue("arm3", currentPose.actuators.arm3.stroke);
     setStrokeBaseValue(currentPose.base);
     updateMetrics(currentPose);
     drawPose(currentPose);
@@ -27712,12 +29176,16 @@ void main() {
       renderMode: "three-js",
       device: "GL-3DPRT-SP-S",
       scriptVersion: SCRIPT_VERSION,
+      coordinateSystem: COORDINATE_SYSTEM_NOTE,
+      deviceSceneRotationY: DEVICE_SCENE_ROTATION_Y_RAD,
       webglAvailable,
       modelEffect,
+      actuatorBallStickOnly,
       keepToolVertical,
       pose: currentPose,
       dynamicObjectCount: ballStickRoot.children.length,
       linearPathObjectCount: pathRoot.children.length,
+      pathRender: pathRenderStats,
       actuatorCount: Object.values(currentPose.actuators).reduce((sum, actuator) => sum + actuator.instances.length, 0),
       linkageCount: Object.values(currentPose.linkages).reduce(
         (sum, linkage) => sum + linkage.instances.reduce(
@@ -27727,6 +29195,14 @@ void main() {
         0
       ),
       linearMotion: { ...linearMotion, animationFrame: Boolean(linearMotion.animationFrame) },
+      importedLinearPath: {
+        active: importedLinearPathActive(),
+        mode: linearMotion.pathMode,
+        sourceName: linearMotion.pathSourceName,
+        pointCount: linearMotion.pathPoints?.length || 0,
+        distance: linearPathDistance(),
+        status: linearMotion.pathStatus
+      },
       tipDrag: {
         enabled: true,
         isDragging: linearDrag.active,
@@ -27772,6 +29248,9 @@ void main() {
   function resize() {
     const rect = canvas.parentElement.getBoundingClientRect();
     renderer.setSize(rect.width, rect.height, false);
+    [materials.walkedPath, materials.remainingPath].forEach((material) => {
+      material.resolution.set(Math.max(1, rect.width), Math.max(1, rect.height));
+    });
     camera.aspect = rect.width / rect.height;
     camera.updateProjectionMatrix();
   }
@@ -27798,8 +29277,20 @@ void main() {
       setDriveMode(mode);
     },
     setLinearPath(payload = {}) {
+      if (Array.isArray(payload.points)) {
+        try {
+          applyImportedLinearPath(payload.points.map((point, index) => normalizePathPoint(point, index)), payload.sourceName || "API");
+        } catch (error) {
+          linearMotion.pathStatus = `\u5BFC\u5165\u5931\u8D25\uFF1A${error?.message || error}`;
+        }
+      } else if (payload.clearPoints) {
+        linearMotion.pathPoints = null;
+        linearMotion.pathSourceName = "";
+        linearMotion.pathStatus = "\u672A\u5BFC\u5165\u8DEF\u5F84\u6587\u4EF6";
+      }
       if (payload.start) linearMotion.startWorld = roundedWorldPoint(payload.start);
       if (payload.end) linearMotion.endWorld = roundedWorldPoint(payload.end);
+      if (payload.mode) linearMotion.pathMode = payload.mode === "points" ? "points" : "interpolated";
       if (Number.isFinite(Number(payload.progress))) linearMotion.progress = clamp2(Number(payload.progress), 0, 100);
       if (Number.isFinite(Number(payload.speed))) linearMotion.speed = Math.max(1, Number(payload.speed));
       syncLinearPointInputs("startWorld");
@@ -27919,14 +29410,6 @@ void main() {
   }
   resize();
   update();
+  loadDefaultImportedLinearPath();
   animate();
 })();
-/*! Bundled license information:
-
-three/build/three.module.js:
-  (**
-   * @license
-   * Copyright 2010-2024 Three.js Authors
-   * SPDX-License-Identifier: MIT
-   *)
-*/
