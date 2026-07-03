@@ -1,4 +1,5 @@
 work/node_modules/
+dist/
 outputs/sps_qt_gui/build/
 outputs/sps_qt_gui/runtime/
 outputs/sps_qt_gui/dist/
