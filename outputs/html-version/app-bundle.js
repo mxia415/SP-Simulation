@@ -26383,6 +26383,7 @@ void main() {
     arm2: { minLength: 1177.9, strokeLength: 680, label: "\u7535\u7F382" },
     arm3: { minLength: 1405.8, strokeLength: 520, label: "\u7535\u7F383" }
   };
+  var IK_ARM2_MAX_STROKE_PREFERENCE_WEIGHT = 12;
   Object.values(ACTUATOR_STROKE_LIMITS).forEach((limit) => {
     limit.maxLength = Number((limit.minLength + limit.strokeLength).toFixed(3));
   });
@@ -26773,8 +26774,22 @@ void main() {
   function actuatorStrokeViolationForPose(pose) {
     return Object.values(pose.actuators).reduce((sum, actuator) => sum + (actuator.violation || 0), 0);
   }
-  function actuatorStrokeViolationForState(state2) {
-    return actuatorStrokeViolationForPose(computePose(state2));
+  function arm2MaxStrokePreferencePenaltyForPose(pose) {
+    const arm2Stroke = pose.actuators?.arm2?.stroke ?? 0;
+    return (1 - arm2Stroke) * IK_ARM2_MAX_STROKE_PREFERENCE_WEIGHT;
+  }
+  function pickBestIkCandidate(candidates, score) {
+    let bestState = clampState(candidates[0] || DEFAULT_STATE);
+    let bestScore = score(bestState);
+    candidates.slice(1).forEach((candidate) => {
+      const state2 = clampState(candidate);
+      const candidateScore = score(state2);
+      if (candidateScore + 1e-3 < bestScore) {
+        bestState = state2;
+        bestScore = candidateScore;
+      }
+    });
+    return { state: bestState, score: bestScore };
   }
   function stateForActuatorStroke(key, normalizedStroke, currentState) {
     const limits = ACTUATOR_STROKE_LIMITS[key];
@@ -26822,13 +26837,17 @@ void main() {
     const keys = ["arm1", "arm2", "arm3", "base"];
     let step = 16;
     const score = (state2) => {
-      const displayTip = worldDisplayedToolPointForState(state2, displayOffset);
+      const pose2 = computePose(state2);
+      const displayTip = rotateXYAround(offsetPoint(pose2.toolCenter, displayOffset), -clampState(state2).base);
       const distance2 = Math.hypot(displayTip.x - target.x, displayTip.y - target.y, displayTip.z - target.z);
-      const actuatorPenalty = actuatorStrokeViolationForState(state2) * 1e3;
+      const actuatorPenalty = actuatorStrokeViolationForPose(pose2) * 1e3;
+      const arm2Preference = arm2MaxStrokePreferencePenaltyForPose(pose2);
       const continuity = Math.abs(angleDistance(state2.arm1, currentState.arm1)) * 0.08 + Math.abs(angleDistance(state2.arm2, currentState.arm2)) * 0.04 + Math.abs(angleDistance(state2.arm3, currentState.arm3)) * 0.04 + Math.abs(angleDistance(state2.base, currentState.base)) * 0.04;
-      return distance2 + continuity + actuatorPenalty;
+      return distance2 + continuity + actuatorPenalty + arm2Preference;
     };
-    let bestScore = score(candidate);
+    const initial = pickBestIkCandidate([candidate, stateForActuatorStroke("arm2", 1, candidate)], score);
+    candidate = initial.state;
+    let bestScore = initial.score;
     for (let iteration = 0; iteration < 240; iteration += 1) {
       let improved = false;
       for (const key of keys) {
@@ -26876,7 +26895,7 @@ void main() {
   }
 
   // outputs/html-version/app.mjs
-  var SCRIPT_VERSION = "20260703-actuator-stroke-v2";
+  var SCRIPT_VERSION = "20260703-arm2-ik-preference";
   var RENDER_SCALE = 1 / 1e3;
   var QT_STAGE_MODE = new URLSearchParams(window.location.search).has("qtStage");
   if (QT_STAGE_MODE) document.documentElement.dataset.qtStage = "true";

@@ -48,4 +48,20 @@ assert.ok(solved.actuatorViolation <= EPS, `inverse actuator violation must be n
 const displayTip = worldDisplayedToolPointForState(solved.state, { x: 0, y: 262, z: 0 });
 assert.ok(Number.isFinite(displayTip.x) && Number.isFinite(displayTip.y) && Number.isFinite(displayTip.z));
 
+const arm2MaxSourceState = stateFromActuatorStrokes({ arm2: 1 }, DEFAULT_STATE);
+const arm2MaxTarget = worldDisplayedToolPointForState(arm2MaxSourceState, { x: 0, y: 262, z: 0 });
+const arm2PreferredSolved = solveStateForWorldDisplayedToolTarget(arm2MaxTarget, DEFAULT_STATE, { x: 0, y: 262, z: 0 });
+const arm2PreferredTip = worldDisplayedToolPointForState(arm2PreferredSolved.state, { x: 0, y: 262, z: 0 });
+const arm2PreferredError = Math.hypot(
+  arm2PreferredTip.x - arm2MaxTarget.x,
+  arm2PreferredTip.y - arm2MaxTarget.y,
+  arm2PreferredTip.z - arm2MaxTarget.z,
+);
+assert.ok(arm2PreferredError <= 5, `arm2 preferred inverse target error must stay low, got ${arm2PreferredError}`);
+assert.ok(
+  arm2PreferredSolved.pose.actuators.arm2.stroke >= 0.95,
+  `inverse solution should prefer high arm2 stroke, got ${arm2PreferredSolved.pose.actuators.arm2.stroke}`,
+);
+assert.ok(arm2PreferredSolved.actuatorViolation <= EPS, "arm2 preferred inverse solution must remain within stroke limits");
+
 console.log("Actuator constraint verification passed.");

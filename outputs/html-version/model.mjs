@@ -61,6 +61,8 @@ export const ACTUATOR_STROKE_LIMITS = {
   arm3: { minLength: 1405.8, strokeLength: 520, label: "电缸3" },
 };
 
+const IK_ARM2_MAX_STROKE_PREFERENCE_WEIGHT = 12;
+
 Object.values(ACTUATOR_STROKE_LIMITS).forEach((limit) => {
   limit.maxLength = Number((limit.minLength + limit.strokeLength).toFixed(3));
 });
@@ -496,8 +498,23 @@ function actuatorStrokeViolationForPose(pose) {
   return Object.values(pose.actuators).reduce((sum, actuator) => sum + (actuator.violation || 0), 0);
 }
 
-function actuatorStrokeViolationForState(state) {
-  return actuatorStrokeViolationForPose(computePose(state));
+function arm2MaxStrokePreferencePenaltyForPose(pose) {
+  const arm2Stroke = pose.actuators?.arm2?.stroke ?? 0;
+  return (1 - arm2Stroke) * IK_ARM2_MAX_STROKE_PREFERENCE_WEIGHT;
+}
+
+function pickBestIkCandidate(candidates, score) {
+  let bestState = clampState(candidates[0] || DEFAULT_STATE);
+  let bestScore = score(bestState);
+  candidates.slice(1).forEach((candidate) => {
+    const state = clampState(candidate);
+    const candidateScore = score(state);
+    if (candidateScore + 0.001 < bestScore) {
+      bestState = state;
+      bestScore = candidateScore;
+    }
+  });
+  return { state: bestState, score: bestScore };
 }
 
 function stateForActuatorStroke(key, normalizedStroke, currentState) {
@@ -545,19 +562,23 @@ export function solveStateForToolTarget(targetWorld, currentState = DEFAULT_STAT
   let step = 16;
 
   const score = (state) => {
-    const tip = computePose(state).toolCenter;
+    const pose = computePose(state);
+    const tip = pose.toolCenter;
     const rotatedTip = rotateXYAround(tip, referenceBase - state.base);
     const distance = Math.hypot(rotatedTip.x - target.x, rotatedTip.y - target.y, rotatedTip.z - target.z);
-    const actuatorPenalty = actuatorStrokeViolationForState(state) * 1000;
+    const actuatorPenalty = actuatorStrokeViolationForPose(pose) * 1000;
+    const arm2Preference = arm2MaxStrokePreferencePenaltyForPose(pose);
     const continuity =
       Math.abs(angleDistance(state.arm1, currentState.arm1)) * 0.08 +
       Math.abs(angleDistance(state.arm2, currentState.arm2)) * 0.04 +
       Math.abs(angleDistance(state.arm3, currentState.arm3)) * 0.04 +
       Math.abs(angleDistance(state.base, currentState.base)) * 0.04;
-    return distance + continuity + actuatorPenalty;
+    return distance + continuity + actuatorPenalty + arm2Preference;
   };
 
-  let bestScore = score(candidate);
+  const initial = pickBestIkCandidate([candidate, stateForActuatorStroke("arm2", 1, candidate)], score);
+  candidate = initial.state;
+  let bestScore = initial.score;
   for (let iteration = 0; iteration < 240; iteration += 1) {
     let improved = false;
     for (const key of keys) {
@@ -599,19 +620,23 @@ export function solveStateForDisplayedToolTarget(targetWorld, currentState = DEF
   let step = 16;
 
   const score = (state) => {
-    const displayTip = offsetPoint(computePose(state).toolCenter, displayOffset);
+    const pose = computePose(state);
+    const displayTip = offsetPoint(pose.toolCenter, displayOffset);
     const rotatedTip = rotateXYAround(displayTip, referenceBase - state.base);
     const distance = Math.hypot(rotatedTip.x - target.x, rotatedTip.y - target.y, rotatedTip.z - target.z);
-    const actuatorPenalty = actuatorStrokeViolationForState(state) * 1000;
+    const actuatorPenalty = actuatorStrokeViolationForPose(pose) * 1000;
+    const arm2Preference = arm2MaxStrokePreferencePenaltyForPose(pose);
     const continuity =
       Math.abs(angleDistance(state.arm1, currentState.arm1)) * 0.08 +
       Math.abs(angleDistance(state.arm2, currentState.arm2)) * 0.04 +
       Math.abs(angleDistance(state.arm3, currentState.arm3)) * 0.04 +
       Math.abs(angleDistance(state.base, currentState.base)) * 0.04;
-    return distance + continuity + actuatorPenalty;
+    return distance + continuity + actuatorPenalty + arm2Preference;
   };
 
-  let bestScore = score(candidate);
+  const initial = pickBestIkCandidate([candidate, stateForActuatorStroke("arm2", 1, candidate)], score);
+  candidate = initial.state;
+  let bestScore = initial.score;
   for (let iteration = 0; iteration < 240; iteration += 1) {
     let improved = false;
     for (const key of keys) {
@@ -659,18 +684,22 @@ export function solveStateForWorldDisplayedToolTarget(targetWorld, currentState 
   let step = 16;
 
   const score = (state) => {
-    const displayTip = worldDisplayedToolPointForState(state, displayOffset);
+    const pose = computePose(state);
+    const displayTip = rotateXYAround(offsetPoint(pose.toolCenter, displayOffset), -clampState(state).base);
     const distance = Math.hypot(displayTip.x - target.x, displayTip.y - target.y, displayTip.z - target.z);
-    const actuatorPenalty = actuatorStrokeViolationForState(state) * 1000;
+    const actuatorPenalty = actuatorStrokeViolationForPose(pose) * 1000;
+    const arm2Preference = arm2MaxStrokePreferencePenaltyForPose(pose);
     const continuity =
       Math.abs(angleDistance(state.arm1, currentState.arm1)) * 0.08 +
       Math.abs(angleDistance(state.arm2, currentState.arm2)) * 0.04 +
       Math.abs(angleDistance(state.arm3, currentState.arm3)) * 0.04 +
       Math.abs(angleDistance(state.base, currentState.base)) * 0.04;
-    return distance + continuity + actuatorPenalty;
+    return distance + continuity + actuatorPenalty + arm2Preference;
   };
 
-  let bestScore = score(candidate);
+  const initial = pickBestIkCandidate([candidate, stateForActuatorStroke("arm2", 1, candidate)], score);
+  candidate = initial.state;
+  let bestScore = initial.score;
   for (let iteration = 0; iteration < 240; iteration += 1) {
     let improved = false;
     for (const key of keys) {
