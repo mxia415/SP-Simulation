@@ -30,7 +30,7 @@ import {
   sceneToDevicePointData,
 } from "./coordinates.mjs";
 
-const SCRIPT_VERSION = "20260706-ik-mode-select";
+const SCRIPT_VERSION = "20260706-return-to-start";
 const RENDER_SCALE = 1 / 1000;
 const QT_STAGE_MODE = new URLSearchParams(window.location.search).has("qtStage");
 if (QT_STAGE_MODE) document.documentElement.dataset.qtStage = "true";
@@ -1479,6 +1479,7 @@ function createLinearControls() {
     <div class="linear-actions">
       <button id="setLinearStart" type="button">当前设为起点</button>
       <button id="setLinearEnd" type="button">当前设为终点</button>
+      <button id="returnLinearStart" type="button">回到起点</button>
       <button id="clearLinearPath" type="button">清除导入路径</button>
       <button id="simulateLinearMotion" type="button">模拟</button>
     </div>
@@ -1519,6 +1520,7 @@ function createLinearControls() {
   document.querySelector("#linearProgressNumber").addEventListener("change", (event) => setLinearProgress(event.target.value));
   document.querySelector("#setLinearStart").addEventListener("click", () => setLinearPoint("startWorld", currentTipWorld()));
   document.querySelector("#setLinearEnd").addEventListener("click", () => setLinearPoint("endWorld", currentTipWorld()));
+  document.querySelector("#returnLinearStart").addEventListener("click", returnLinearToStart);
   document.querySelector("#clearLinearPath").addEventListener("click", clearImportedLinearPath);
   document.querySelector("#simulateLinearMotion").addEventListener("click", startLinearSimulation);
   syncLinearReadouts();
@@ -1850,6 +1852,26 @@ function stopLinearSimulation() {
   linearMotion.isSimulating = false;
   const button = document.querySelector("#simulateLinearMotion");
   if (button) button.textContent = "模拟";
+}
+
+function returnLinearToStart() {
+  stopLinearSimulation();
+  linearMotion.progress = 0;
+  resetLinearIkHistory();
+  if (linearMotion.startState) {
+    Object.assign(state, clampState(linearMotion.startState));
+  } else if (linearMotion.startWorld) {
+    const solved = solveStateForWorldDisplayedToolTarget(linearMotion.startWorld, state, TOOL_BALL_STICK_OFFSET_MM, {
+      ikMode: linearMotion.ikMode,
+      previousDelta: linearMotion.previousIkDelta,
+    });
+    Object.assign(state, solved.state);
+  }
+  resetLinearIkHistory();
+  applyToolVerticalConstraint();
+  syncLinearPointInputs("startWorld");
+  syncLinearPointInputs("endWorld");
+  update(0);
 }
 
 function startLinearSimulation() {

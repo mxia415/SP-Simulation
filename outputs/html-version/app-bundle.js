@@ -26918,7 +26918,7 @@ void main() {
   }
 
   // outputs/html-version/app.mjs
-  var SCRIPT_VERSION = "20260706-ik-mode-select";
+  var SCRIPT_VERSION = "20260706-return-to-start";
   var RENDER_SCALE = 1 / 1e3;
   var QT_STAGE_MODE = new URLSearchParams(window.location.search).has("qtStage");
   if (QT_STAGE_MODE) document.documentElement.dataset.qtStage = "true";
@@ -28244,6 +28244,7 @@ void main() {
     <div class="linear-actions">
       <button id="setLinearStart" type="button">\u5F53\u524D\u8BBE\u4E3A\u8D77\u70B9</button>
       <button id="setLinearEnd" type="button">\u5F53\u524D\u8BBE\u4E3A\u7EC8\u70B9</button>
+      <button id="returnLinearStart" type="button">\u56DE\u5230\u8D77\u70B9</button>
       <button id="clearLinearPath" type="button">\u6E05\u9664\u5BFC\u5165\u8DEF\u5F84</button>
       <button id="simulateLinearMotion" type="button">\u6A21\u62DF</button>
     </div>
@@ -28283,6 +28284,7 @@ void main() {
     document.querySelector("#linearProgressNumber").addEventListener("change", (event) => setLinearProgress(event.target.value));
     document.querySelector("#setLinearStart").addEventListener("click", () => setLinearPoint("startWorld", currentTipWorld()));
     document.querySelector("#setLinearEnd").addEventListener("click", () => setLinearPoint("endWorld", currentTipWorld()));
+    document.querySelector("#returnLinearStart").addEventListener("click", returnLinearToStart);
     document.querySelector("#clearLinearPath").addEventListener("click", clearImportedLinearPath);
     document.querySelector("#simulateLinearMotion").addEventListener("click", startLinearSimulation);
     syncLinearReadouts();
@@ -28577,6 +28579,25 @@ void main() {
     linearMotion.isSimulating = false;
     const button = document.querySelector("#simulateLinearMotion");
     if (button) button.textContent = "\u6A21\u62DF";
+  }
+  function returnLinearToStart() {
+    stopLinearSimulation();
+    linearMotion.progress = 0;
+    resetLinearIkHistory();
+    if (linearMotion.startState) {
+      Object.assign(state, clampState(linearMotion.startState));
+    } else if (linearMotion.startWorld) {
+      const solved = solveStateForWorldDisplayedToolTarget(linearMotion.startWorld, state, TOOL_BALL_STICK_OFFSET_MM, {
+        ikMode: linearMotion.ikMode,
+        previousDelta: linearMotion.previousIkDelta
+      });
+      Object.assign(state, solved.state);
+    }
+    resetLinearIkHistory();
+    applyToolVerticalConstraint();
+    syncLinearPointInputs("startWorld");
+    syncLinearPointInputs("endWorld");
+    update(0);
   }
   function startLinearSimulation() {
     if (linearMotion.isSimulating) {

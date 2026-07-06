@@ -218,6 +218,32 @@ try {
     throw new Error(`Improved IK simulation must retain previous joint delta: ${JSON.stringify(improvedResult, null, 2)}`);
   }
 
+  await page.click("#returnLinearStart");
+  const returnedResult = await page.evaluate(() => ({
+    progress: window.__lingzhuDebug.linearMotion?.progress,
+    state: {
+      arm1: window.__lingzhuDebug.pose?.arm1,
+      arm2: window.__lingzhuDebug.pose?.arm2,
+      arm3: window.__lingzhuDebug.pose?.arm3,
+      offset: window.__lingzhuDebug.pose?.offset,
+      base: window.__lingzhuDebug.pose?.base,
+    },
+    startState: window.__lingzhuDebug.linearMotion?.startState,
+    previousIkDelta: window.__lingzhuDebug.linearMotion?.previousIkDelta,
+    progressInput: document.querySelector("#linearProgressNumber")?.value,
+    solveErrorText: document.querySelector("#linearSolveError")?.value,
+  }));
+  const stateKeys = ["arm1", "arm2", "arm3", "offset", "base"];
+  const poseMatchesStart = stateKeys.every(
+    (key) => Math.abs(Number(returnedResult.state?.[key]) - Number(returnedResult.startState?.[key])) < 0.001,
+  );
+  const ikHistoryCleared = ["arm1", "arm2", "arm3"].every(
+    (key) => Math.abs(Number(returnedResult.previousIkDelta?.[key])) < 0.001,
+  );
+  if (returnedResult.progress !== 0 || returnedResult.progressInput !== "0" || !poseMatchesStart || !ikHistoryCleared) {
+    throw new Error(`Return-to-start must restore progress, pose, and IK history: ${JSON.stringify(returnedResult, null, 2)}`);
+  }
+
   console.log(JSON.stringify(result, null, 2));
 } finally {
   await browser.close();
