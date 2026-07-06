@@ -30,7 +30,7 @@ import {
   sceneToDevicePointData,
 } from "./coordinates.mjs";
 
-const SCRIPT_VERSION = "20260706-ik-original";
+const SCRIPT_VERSION = "20260706-ik-mode-select";
 const RENDER_SCALE = 1 / 1000;
 const QT_STAGE_MODE = new URLSearchParams(window.location.search).has("qtStage");
 if (QT_STAGE_MODE) document.documentElement.dataset.qtStage = "true";
@@ -400,6 +400,8 @@ const linearMotion = {
   pathMode: "interpolated",
   pathSourceName: "",
   pathStatus: "未导入路径文件",
+  ikMode: "original",
+  previousIkDelta: { arm1: 0, arm2: 0, arm3: 0 },
   progress: 0,
   speed: 500,
   animationFrame: null,
@@ -1440,6 +1442,12 @@ function createLinearControls() {
     </div>
     <div class="linear-grid">
       <label>末端速度 mm/s <input id="linearSpeed" type="number" min="1" step="10" value="${linearMotion.speed}" /></label>
+      <label>IK算法
+        <select id="linearIkMode">
+          <option value="original">Original</option>
+          <option value="improved">Improved</option>
+        </select>
+      </label>
       <label>路径长度 <output id="linearPathDistance">0 mm</output></label>
       <label>预计时间 <output id="linearDurationEstimate">0.0 s</output></label>
       <label>求解误差 <output id="linearSolveError">0 mm</output></label>
@@ -1483,6 +1491,7 @@ function createLinearControls() {
         stopLinearSimulation();
         linearMotion[kind][axis.toLowerCase()] = Number(event.target.value);
         if (kind === "startWorld") linearMotion.startState = null;
+        resetLinearIkHistory();
         syncLinearReadouts();
         runLinearMotion();
       });
@@ -1496,7 +1505,14 @@ function createLinearControls() {
   document.querySelector("#linearPathMode").addEventListener("change", (event) => {
     stopLinearSimulation();
     linearMotion.pathMode = event.target.value === "points" ? "points" : "interpolated";
+    resetLinearIkHistory();
     runLinearMotion();
+  });
+  document.querySelector("#linearIkMode").addEventListener("change", (event) => {
+    stopLinearSimulation();
+    linearMotion.ikMode = event.target.value === "improved" ? "improved" : "original";
+    resetLinearIkHistory();
+    runLinearMotion({ resetToStartState: importedLinearPathActive() });
   });
   document.querySelector("#linearPathFile").addEventListener("change", onLinearPathFileSelected);
   document.querySelector("#linearProgress").addEventListener("input", (event) => setLinearProgress(event.target.value));
@@ -1535,6 +1551,10 @@ function segmentDistance(a, b) {
 
 function linearPathDistance() {
   return pathDistanceForPoints(activeLinearPathPoints());
+}
+
+function resetLinearIkHistory() {
+  linearMotion.previousIkDelta = { arm1: 0, arm2: 0, arm3: 0 };
 }
 
 function pathDistanceForPoints(points) {
@@ -1614,6 +1634,8 @@ function syncLinearReadouts(error = 0) {
   document.querySelector("#simulateLinearMotion").textContent = linearMotion.isSimulating ? "停止" : "模拟";
   const modeSelect = document.querySelector("#linearPathMode");
   if (modeSelect) modeSelect.value = linearMotion.pathMode;
+  const ikModeSelect = document.querySelector("#linearIkMode");
+  if (ikModeSelect) ikModeSelect.value = linearMotion.ikMode;
   const countOutput = document.querySelector("#linearPathPointCount");
   if (countOutput) countOutput.value = importedLinearPathActive() ? String(linearMotion.pathPoints.length) : "0";
   const statusOutput = document.querySelector("#linearPathStatus");
@@ -1629,6 +1651,7 @@ function setLinearPoint(kind, point) {
   }
   linearMotion[kind] = roundedWorldPoint(point);
   if (kind === "startWorld") linearMotion.startState = { ...state };
+  resetLinearIkHistory();
   syncLinearPointInputs(kind);
   syncLinearReadouts();
 }
@@ -1705,6 +1728,7 @@ function applyImportedLinearPath(points, sourceName = "") {
   linearMotion.startWorld = roundedWorldPoint(simulationPoints[0]);
   linearMotion.endWorld = roundedWorldPoint(simulationPoints[simulationPoints.length - 1]);
   linearMotion.startState = verticalPoseState();
+  resetLinearIkHistory();
   linearMotion.progress = 0;
   syncLinearPointInputs("startWorld");
   syncLinearPointInputs("endWorld");
@@ -1750,6 +1774,7 @@ function clearImportedLinearPath() {
   linearMotion.pathPoints = null;
   linearMotion.pathSourceName = "";
   linearMotion.pathStatus = "未导入路径文件";
+  resetLinearIkHistory();
   linearMotion.progress = 0;
   syncLinearReadouts();
   runLinearMotion();
@@ -1794,14 +1819,20 @@ function displayedLinearTargetFromProgress() {
 function runLinearMotion({ resetToStartState = false } = {}) {
   if (resetToStartState && linearMotion.startState) {
     Object.assign(state, clampState(linearMotion.startState));
+    resetLinearIkHistory();
   }
   if (importedLinearPathActive() && linearMotion.startState && linearMotion.progress <= 0.001) {
     Object.assign(state, clampState(linearMotion.startState));
+    resetLinearIkHistory();
     update(0);
     return;
   }
-  const solved = solveStateForWorldDisplayedToolTarget(linearTargetFromProgress(), state, TOOL_BALL_STICK_OFFSET_MM);
+  const solved = solveStateForWorldDisplayedToolTarget(linearTargetFromProgress(), state, TOOL_BALL_STICK_OFFSET_MM, {
+    ikMode: linearMotion.ikMode,
+    previousDelta: linearMotion.previousIkDelta,
+  });
   Object.assign(state, solved.state);
+  linearMotion.previousIkDelta = solved.delta || linearMotion.previousIkDelta;
   applyToolVerticalConstraint();
   update(solved.error);
 }
@@ -1809,6 +1840,7 @@ function runLinearMotion({ resetToStartState = false } = {}) {
 function setLinearProgress(value) {
   stopLinearSimulation();
   linearMotion.progress = clamp(Number(value), 0, 100);
+  resetLinearIkHistory();
   runLinearMotion({ resetToStartState: importedLinearPathActive() });
 }
 
@@ -1828,6 +1860,7 @@ function startLinearSimulation() {
   const pathDistance = linearPathDistance();
   if (pathDistance < 0.001) return;
   if (linearMotion.startState) Object.assign(state, clampState(linearMotion.startState));
+  resetLinearIkHistory();
   linearMotion.progress = 0;
   runLinearMotion();
   linearMotion.startedAt = performance.now();
@@ -1927,14 +1960,19 @@ function linearPointFromDragEvent(event) {
 function setLinearDraggedTarget(worldPoint) {
   if (!linearMotion.startWorld) return;
   stopLinearSimulation();
+  resetLinearIkHistory();
   if (importedLinearPathActive()) {
     linearMotion.pathPoints = null;
     linearMotion.pathSourceName = "";
     linearMotion.pathStatus = "已切回拖拽终点路径";
   }
   const targetWorld = roundedWorldPoint(worldPoint);
-  const solved = solveStateForWorldDisplayedToolTarget(targetWorld, state, TOOL_BALL_STICK_OFFSET_MM);
+  const solved = solveStateForWorldDisplayedToolTarget(targetWorld, state, TOOL_BALL_STICK_OFFSET_MM, {
+    ikMode: linearMotion.ikMode,
+    previousDelta: linearMotion.previousIkDelta,
+  });
   Object.assign(state, solved.state);
+  linearMotion.previousIkDelta = solved.delta || linearMotion.previousIkDelta;
   applyToolVerticalConstraint();
   linearMotion.endWorld = targetWorld;
   linearMotion.progress = 100;

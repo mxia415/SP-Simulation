@@ -30,6 +30,15 @@ export const PRESETS = {
   },
 };
 
+export const IK_MODES = {
+  original: { key: "original", label: "Original" },
+  improved: { key: "improved", label: "Improved" },
+};
+
+const IMPROVED_IK_REFERENCE_DEG = { arm1: 30, arm2: 0, arm3: -180 };
+const IMPROVED_IK_POSTURE_GAMMA = 5.0;
+const IMPROVED_IK_SMOOTHNESS_MU = 3.0;
+
 export const JOINTS = {
   baseArm1: { x: -450.742, y: 0, z: 385.188, name: "底座-臂1旋转轴心" },
   arm1Arm2: { x: -450.742, y: 0, z: 3782.1, name: "臂1-臂2旋转轴心" },
@@ -500,6 +509,46 @@ function actuatorStrokeViolationForState(state) {
   return actuatorStrokeViolationForPose(computePose(state));
 }
 
+function normalizedIkMode(mode) {
+  return mode === IK_MODES.improved.key ? IK_MODES.improved.key : IK_MODES.original.key;
+}
+
+function relativeIkAnglesDeg(state) {
+  return {
+    arm1: state.arm1,
+    arm2: -state.arm2,
+    arm3: -state.arm3,
+  };
+}
+
+function relativeIkDeltaDeg(candidate, currentState) {
+  const q = relativeIkAnglesDeg(candidate);
+  const current = relativeIkAnglesDeg(currentState);
+  return {
+    arm1: q.arm1 - current.arm1,
+    arm2: q.arm2 - current.arm2,
+    arm3: q.arm3 - current.arm3,
+  };
+}
+
+function improvedIkPenalty(candidate, currentState, previousDelta = {}) {
+  const q = relativeIkAnglesDeg(candidate);
+  const dq = relativeIkDeltaDeg(candidate, currentState);
+  const posture =
+    ((q.arm1 - IMPROVED_IK_REFERENCE_DEG.arm1) ** 2 +
+      (q.arm2 - IMPROVED_IK_REFERENCE_DEG.arm2) ** 2 +
+      (q.arm3 - IMPROVED_IK_REFERENCE_DEG.arm3) ** 2) *
+    IMPROVED_IK_POSTURE_GAMMA *
+    0.01;
+  const smoothness =
+    ((dq.arm1 - (previousDelta.arm1 || 0)) ** 2 +
+      (dq.arm2 - (previousDelta.arm2 || 0)) ** 2 +
+      (dq.arm3 - (previousDelta.arm3 || 0)) ** 2) *
+    IMPROVED_IK_SMOOTHNESS_MU *
+    0.01;
+  return { posture, smoothness };
+}
+
 function stateForActuatorStroke(key, normalizedStroke, currentState) {
   const limits = ACTUATOR_STROKE_LIMITS[key];
   if (!limits) return currentState;
@@ -532,9 +581,11 @@ export function stateFromActuatorStrokes(strokes, currentState = DEFAULT_STATE) 
   return clampState(nextState);
 }
 
-export function solveStateForToolTarget(targetWorld, currentState = DEFAULT_STATE) {
+export function solveStateForToolTarget(targetWorld, currentState = DEFAULT_STATE, options = {}) {
   let candidate = clampState(currentState);
   const referenceBase = candidate.base;
+  const ikMode = normalizedIkMode(options.ikMode);
+  const previousDelta = options.previousDelta || {};
   const target = {
     x: Number(targetWorld.x ?? computePose(candidate).toolCenter.x),
     y: Number(targetWorld.y ?? computePose(candidate).toolCenter.y),
@@ -554,6 +605,10 @@ export function solveStateForToolTarget(targetWorld, currentState = DEFAULT_STAT
       Math.abs(angleDistance(state.arm2, currentState.arm2)) * 0.04 +
       Math.abs(angleDistance(state.arm3, currentState.arm3)) * 0.04 +
       Math.abs(angleDistance(state.base, currentState.base)) * 0.04;
+    if (ikMode === IK_MODES.improved.key) {
+      const improvedPenalty = improvedIkPenalty(state, currentState, previousDelta);
+      return distance + continuity * 0.3 + improvedPenalty.posture + improvedPenalty.smoothness + actuatorPenalty;
+    }
     return distance + continuity + actuatorPenalty;
   };
 
@@ -577,19 +632,24 @@ export function solveStateForToolTarget(targetWorld, currentState = DEFAULT_STAT
   }
 
   const pose = computePose(candidate);
+  const delta = relativeIkDeltaDeg(candidate, currentState);
   return {
     state: candidate,
     pose,
     target,
     error: score(candidate),
+    ikMode,
+    delta,
     actuatorViolation: actuatorStrokeViolationForPose(pose),
     reachable: bestScore < 35,
   };
 }
 
-export function solveStateForDisplayedToolTarget(targetWorld, currentState = DEFAULT_STATE, displayOffset = {}) {
+export function solveStateForDisplayedToolTarget(targetWorld, currentState = DEFAULT_STATE, displayOffset = {}, options = {}) {
   let candidate = clampState(currentState);
   const referenceBase = candidate.base;
+  const ikMode = normalizedIkMode(options.ikMode);
+  const previousDelta = options.previousDelta || {};
   const target = {
     x: Number(targetWorld.x ?? offsetPoint(computePose(candidate).toolCenter, displayOffset).x),
     y: Number(targetWorld.y ?? offsetPoint(computePose(candidate).toolCenter, displayOffset).y),
@@ -608,6 +668,10 @@ export function solveStateForDisplayedToolTarget(targetWorld, currentState = DEF
       Math.abs(angleDistance(state.arm2, currentState.arm2)) * 0.04 +
       Math.abs(angleDistance(state.arm3, currentState.arm3)) * 0.04 +
       Math.abs(angleDistance(state.base, currentState.base)) * 0.04;
+    if (ikMode === IK_MODES.improved.key) {
+      const improvedPenalty = improvedIkPenalty(state, currentState, previousDelta);
+      return distance + continuity * 0.3 + improvedPenalty.posture + improvedPenalty.smoothness + actuatorPenalty;
+    }
     return distance + continuity + actuatorPenalty;
   };
 
@@ -631,11 +695,14 @@ export function solveStateForDisplayedToolTarget(targetWorld, currentState = DEF
   }
 
   const pose = computePose(candidate);
+  const delta = relativeIkDeltaDeg(candidate, currentState);
   return {
     state: candidate,
     pose,
     target,
     error: score(candidate),
+    ikMode,
+    delta,
     actuatorViolation: actuatorStrokeViolationForPose(pose),
     reachable: bestScore < 35,
   };
@@ -647,8 +714,10 @@ export function worldDisplayedToolPointForState(rawState, displayOffset = {}) {
   return rotateXYAround(displayTip, -state.base);
 }
 
-export function solveStateForWorldDisplayedToolTarget(targetWorld, currentState = DEFAULT_STATE, displayOffset = {}) {
+export function solveStateForWorldDisplayedToolTarget(targetWorld, currentState = DEFAULT_STATE, displayOffset = {}, options = {}) {
   let candidate = clampState(currentState);
+  const ikMode = normalizedIkMode(options.ikMode);
+  const previousDelta = options.previousDelta || {};
   const currentDisplayTip = worldDisplayedToolPointForState(candidate, displayOffset);
   const target = {
     x: Number(targetWorld.x ?? currentDisplayTip.x),
@@ -667,6 +736,10 @@ export function solveStateForWorldDisplayedToolTarget(targetWorld, currentState 
       Math.abs(angleDistance(state.arm2, currentState.arm2)) * 0.04 +
       Math.abs(angleDistance(state.arm3, currentState.arm3)) * 0.04 +
       Math.abs(angleDistance(state.base, currentState.base)) * 0.04;
+    if (ikMode === IK_MODES.improved.key) {
+      const improvedPenalty = improvedIkPenalty(state, currentState, previousDelta);
+      return distance + continuity * 0.3 + improvedPenalty.posture + improvedPenalty.smoothness + actuatorPenalty;
+    }
     return distance + continuity + actuatorPenalty;
   };
 
@@ -690,11 +763,14 @@ export function solveStateForWorldDisplayedToolTarget(targetWorld, currentState 
   }
 
   const pose = computePose(candidate);
+  const delta = relativeIkDeltaDeg(candidate, currentState);
   return {
     state: candidate,
     pose,
     target,
     error: score(candidate),
+    ikMode,
+    delta,
     actuatorViolation: actuatorStrokeViolationForPose(pose),
     reachable: bestScore < 35,
   };

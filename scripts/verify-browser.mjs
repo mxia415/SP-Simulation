@@ -85,12 +85,16 @@ try {
     driveLinearVisible: document.querySelector("#linearPanel") ? !document.querySelector("#linearPanel").hidden : true,
     pointCount: document.querySelector("#linearPathPointCount")?.value,
     status: document.querySelector("#linearPathStatus")?.value,
+    ikMode: document.querySelector("#linearIkMode")?.value,
     debug: window.__lingzhuDebug.importedLinearPath,
     pathRender: window.__lingzhuDebug.pathRender,
   }));
 
   if (!defaultResult.modeButtonActive || !defaultResult.debug?.active || defaultResult.debug?.pointCount !== 1163) {
     throw new Error(`Default cuboid path must be imported on startup: ${JSON.stringify(defaultResult, null, 2)}`);
+  }
+  if (defaultResult.ikMode !== "original") {
+    throw new Error(`Default IK mode must be Original: ${JSON.stringify(defaultResult, null, 2)}`);
   }
   if (defaultResult.pathRender?.pointMarkers !== 0) {
     throw new Error(`Default imported cuboid path must not show point markers: ${JSON.stringify(defaultResult, null, 2)}`);
@@ -120,6 +124,7 @@ try {
     pointCount: document.querySelector("#linearPathPointCount")?.value,
     coordinateNote: document.querySelector(".coordinate-note")?.textContent,
     mode: document.querySelector("#linearPathMode")?.value,
+    ikMode: document.querySelector("#linearIkMode")?.value,
     debug: window.__lingzhuDebug.importedLinearPath,
     linearMotion: window.__lingzhuDebug.linearMotion,
     pathRender: window.__lingzhuDebug.pathRender,
@@ -139,6 +144,9 @@ try {
   }
   if (result.pointCount !== "4" || result.mode !== "points" || !result.debug?.active) {
     throw new Error(`Path import verification failed: ${JSON.stringify(result, null, 2)}`);
+  }
+  if (result.ikMode !== "original" || result.linearMotion?.ikMode !== "original") {
+    throw new Error(`Original IK mode must be reflected in debug state: ${JSON.stringify(result, null, 2)}`);
   }
   const firstImportedPoint = { x: 3600, y: -800, z: 1200 };
   const simulationPath = result.linearMotion?.pathPoints || [];
@@ -189,6 +197,25 @@ try {
   }
   if (!result.coordinateSystem?.includes("3D视角 X/Y/Z") || !result.coordinateNote?.includes("Z为高度")) {
     throw new Error(`Coordinate note verification failed: ${JSON.stringify(result, null, 2)}`);
+  }
+
+  await page.selectOption("#linearIkMode", "improved");
+  await page.fill("#linearProgressNumber", "50");
+  await page.dispatchEvent("#linearProgressNumber", "change");
+  const improvedResult = await page.evaluate(() => ({
+    ikMode: document.querySelector("#linearIkMode")?.value,
+    linearMotion: window.__lingzhuDebug.linearMotion,
+    solveErrorText: document.querySelector("#linearSolveError")?.value,
+    bootErrors: window.__lingzhuBootErrors,
+  }));
+  if (improvedResult.bootErrors?.length) {
+    throw new Error(`Improved IK switch produced boot errors: ${JSON.stringify(improvedResult, null, 2)}`);
+  }
+  if (improvedResult.ikMode !== "improved" || improvedResult.linearMotion?.ikMode !== "improved") {
+    throw new Error(`Improved IK mode must be selectable and reflected in debug state: ${JSON.stringify(improvedResult, null, 2)}`);
+  }
+  if (!Number.isFinite(improvedResult.linearMotion?.previousIkDelta?.arm1)) {
+    throw new Error(`Improved IK simulation must retain previous joint delta: ${JSON.stringify(improvedResult, null, 2)}`);
   }
 
   console.log(JSON.stringify(result, null, 2));

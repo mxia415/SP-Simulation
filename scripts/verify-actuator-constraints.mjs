@@ -48,4 +48,16 @@ assert.ok(solved.actuatorViolation <= EPS, `inverse actuator violation must be n
 const displayTip = worldDisplayedToolPointForState(solved.state, { x: 0, y: 262, z: 0 });
 assert.ok(Number.isFinite(displayTip.x) && Number.isFinite(displayTip.y) && Number.isFinite(displayTip.z));
 
+const ikTarget = worldDisplayedToolPointForState({ arm1: 82, arm2: 105, arm3: 96, offset: 0, base: 180 }, { x: 0, y: 262, z: 0 });
+const originalIk = solveStateForWorldDisplayedToolTarget(ikTarget, DEFAULT_STATE, { x: 0, y: 262, z: 0 }, { ikMode: "original" });
+assert.equal(originalIk.ikMode, "original", "original IK mode should be reported");
+assert.ok(originalIk.delta && Number.isFinite(originalIk.delta.arm1), "original IK should return a joint delta");
+
+const improvedIk = solveStateForWorldDisplayedToolTarget(ikTarget, DEFAULT_STATE, { x: 0, y: 262, z: 0 }, {
+  ikMode: "improved",
+  previousDelta: originalIk.delta,
+});
+assert.equal(improvedIk.ikMode, "improved", "improved IK mode should be reported");
+assert.ok(improvedIk.delta && Number.isFinite(improvedIk.delta.arm2), "improved IK should return a joint delta");
+
 console.log("Actuator constraint verification passed.");

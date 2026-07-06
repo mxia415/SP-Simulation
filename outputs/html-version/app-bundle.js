@@ -26359,6 +26359,13 @@ void main() {
       keepToolVertical: false
     }
   };
+  var IK_MODES = {
+    original: { key: "original", label: "Original" },
+    improved: { key: "improved", label: "Improved" }
+  };
+  var IMPROVED_IK_REFERENCE_DEG = { arm1: 30, arm2: 0, arm3: -180 };
+  var IMPROVED_IK_POSTURE_GAMMA = 5;
+  var IMPROVED_IK_SMOOTHNESS_MU = 3;
   var JOINTS = {
     baseArm1: { x: -450.742, y: 0, z: 385.188, name: "\u5E95\u5EA7-\u81C21\u65CB\u8F6C\u8F74\u5FC3" },
     arm1Arm2: { x: -450.742, y: 0, z: 3782.1, name: "\u81C21-\u81C22\u65CB\u8F6C\u8F74\u5FC3" },
@@ -26776,6 +26783,32 @@ void main() {
   function actuatorStrokeViolationForState(state2) {
     return actuatorStrokeViolationForPose(computePose(state2));
   }
+  function normalizedIkMode(mode) {
+    return mode === IK_MODES.improved.key ? IK_MODES.improved.key : IK_MODES.original.key;
+  }
+  function relativeIkAnglesDeg(state2) {
+    return {
+      arm1: state2.arm1,
+      arm2: -state2.arm2,
+      arm3: -state2.arm3
+    };
+  }
+  function relativeIkDeltaDeg(candidate, currentState) {
+    const q = relativeIkAnglesDeg(candidate);
+    const current = relativeIkAnglesDeg(currentState);
+    return {
+      arm1: q.arm1 - current.arm1,
+      arm2: q.arm2 - current.arm2,
+      arm3: q.arm3 - current.arm3
+    };
+  }
+  function improvedIkPenalty(candidate, currentState, previousDelta = {}) {
+    const q = relativeIkAnglesDeg(candidate);
+    const dq = relativeIkDeltaDeg(candidate, currentState);
+    const posture = ((q.arm1 - IMPROVED_IK_REFERENCE_DEG.arm1) ** 2 + (q.arm2 - IMPROVED_IK_REFERENCE_DEG.arm2) ** 2 + (q.arm3 - IMPROVED_IK_REFERENCE_DEG.arm3) ** 2) * IMPROVED_IK_POSTURE_GAMMA * 0.01;
+    const smoothness = ((dq.arm1 - (previousDelta.arm1 || 0)) ** 2 + (dq.arm2 - (previousDelta.arm2 || 0)) ** 2 + (dq.arm3 - (previousDelta.arm3 || 0)) ** 2) * IMPROVED_IK_SMOOTHNESS_MU * 0.01;
+    return { posture, smoothness };
+  }
   function stateForActuatorStroke(key, normalizedStroke, currentState) {
     const limits = ACTUATOR_STROKE_LIMITS[key];
     if (!limits) return currentState;
@@ -26811,8 +26844,10 @@ void main() {
     const displayTip = offsetPoint(computePose(state2).toolCenter, displayOffset);
     return rotateXYAround(displayTip, -state2.base);
   }
-  function solveStateForWorldDisplayedToolTarget(targetWorld, currentState = DEFAULT_STATE, displayOffset = {}) {
+  function solveStateForWorldDisplayedToolTarget(targetWorld, currentState = DEFAULT_STATE, displayOffset = {}, options = {}) {
     let candidate = clampState(currentState);
+    const ikMode = normalizedIkMode(options.ikMode);
+    const previousDelta = options.previousDelta || {};
     const currentDisplayTip = worldDisplayedToolPointForState(candidate, displayOffset);
     const target = {
       x: Number(targetWorld.x ?? currentDisplayTip.x),
@@ -26826,6 +26861,10 @@ void main() {
       const distance2 = Math.hypot(displayTip.x - target.x, displayTip.y - target.y, displayTip.z - target.z);
       const actuatorPenalty = actuatorStrokeViolationForState(state2) * 1e3;
       const continuity = Math.abs(angleDistance(state2.arm1, currentState.arm1)) * 0.08 + Math.abs(angleDistance(state2.arm2, currentState.arm2)) * 0.04 + Math.abs(angleDistance(state2.arm3, currentState.arm3)) * 0.04 + Math.abs(angleDistance(state2.base, currentState.base)) * 0.04;
+      if (ikMode === IK_MODES.improved.key) {
+        const improvedPenalty = improvedIkPenalty(state2, currentState, previousDelta);
+        return distance2 + continuity * 0.3 + improvedPenalty.posture + improvedPenalty.smoothness + actuatorPenalty;
+      }
       return distance2 + continuity + actuatorPenalty;
     };
     let bestScore = score(candidate);
@@ -26847,11 +26886,14 @@ void main() {
       if (step < 0.05) break;
     }
     const pose = computePose(candidate);
+    const delta = relativeIkDeltaDeg(candidate, currentState);
     return {
       state: candidate,
       pose,
       target,
       error: score(candidate),
+      ikMode,
+      delta,
       actuatorViolation: actuatorStrokeViolationForPose(pose),
       reachable: bestScore < 35
     };
@@ -26876,7 +26918,7 @@ void main() {
   }
 
   // outputs/html-version/app.mjs
-  var SCRIPT_VERSION = "20260706-ik-original";
+  var SCRIPT_VERSION = "20260706-ik-mode-select";
   var RENDER_SCALE = 1 / 1e3;
   var QT_STAGE_MODE = new URLSearchParams(window.location.search).has("qtStage");
   if (QT_STAGE_MODE) document.documentElement.dataset.qtStage = "true";
@@ -27223,6 +27265,8 @@ void main() {
     pathMode: "interpolated",
     pathSourceName: "",
     pathStatus: "\u672A\u5BFC\u5165\u8DEF\u5F84\u6587\u4EF6",
+    ikMode: "original",
+    previousIkDelta: { arm1: 0, arm2: 0, arm3: 0 },
     progress: 0,
     speed: 500,
     animationFrame: null,
@@ -28163,6 +28207,12 @@ void main() {
     </div>
     <div class="linear-grid">
       <label>\u672B\u7AEF\u901F\u5EA6 mm/s <input id="linearSpeed" type="number" min="1" step="10" value="${linearMotion.speed}" /></label>
+      <label>IK\u7B97\u6CD5
+        <select id="linearIkMode">
+          <option value="original">Original</option>
+          <option value="improved">Improved</option>
+        </select>
+      </label>
       <label>\u8DEF\u5F84\u957F\u5EA6 <output id="linearPathDistance">0 mm</output></label>
       <label>\u9884\u8BA1\u65F6\u95F4 <output id="linearDurationEstimate">0.0 s</output></label>
       <label>\u6C42\u89E3\u8BEF\u5DEE <output id="linearSolveError">0 mm</output></label>
@@ -28205,6 +28255,7 @@ void main() {
           stopLinearSimulation();
           linearMotion[kind][axis.toLowerCase()] = Number(event.target.value);
           if (kind === "startWorld") linearMotion.startState = null;
+          resetLinearIkHistory();
           syncLinearReadouts();
           runLinearMotion();
         });
@@ -28218,7 +28269,14 @@ void main() {
     document.querySelector("#linearPathMode").addEventListener("change", (event) => {
       stopLinearSimulation();
       linearMotion.pathMode = event.target.value === "points" ? "points" : "interpolated";
+      resetLinearIkHistory();
       runLinearMotion();
+    });
+    document.querySelector("#linearIkMode").addEventListener("change", (event) => {
+      stopLinearSimulation();
+      linearMotion.ikMode = event.target.value === "improved" ? "improved" : "original";
+      resetLinearIkHistory();
+      runLinearMotion({ resetToStartState: importedLinearPathActive() });
     });
     document.querySelector("#linearPathFile").addEventListener("change", onLinearPathFileSelected);
     document.querySelector("#linearProgress").addEventListener("input", (event) => setLinearProgress(event.target.value));
@@ -28250,6 +28308,9 @@ void main() {
   }
   function linearPathDistance() {
     return pathDistanceForPoints(activeLinearPathPoints());
+  }
+  function resetLinearIkHistory() {
+    linearMotion.previousIkDelta = { arm1: 0, arm2: 0, arm3: 0 };
   }
   function pathDistanceForPoints(points) {
     let total = 0;
@@ -28324,6 +28385,8 @@ void main() {
     document.querySelector("#simulateLinearMotion").textContent = linearMotion.isSimulating ? "\u505C\u6B62" : "\u6A21\u62DF";
     const modeSelect = document.querySelector("#linearPathMode");
     if (modeSelect) modeSelect.value = linearMotion.pathMode;
+    const ikModeSelect = document.querySelector("#linearIkMode");
+    if (ikModeSelect) ikModeSelect.value = linearMotion.ikMode;
     const countOutput = document.querySelector("#linearPathPointCount");
     if (countOutput) countOutput.value = importedLinearPathActive() ? String(linearMotion.pathPoints.length) : "0";
     const statusOutput = document.querySelector("#linearPathStatus");
@@ -28338,6 +28401,7 @@ void main() {
     }
     linearMotion[kind] = roundedWorldPoint(point);
     if (kind === "startWorld") linearMotion.startState = { ...state };
+    resetLinearIkHistory();
     syncLinearPointInputs(kind);
     syncLinearReadouts();
   }
@@ -28401,6 +28465,7 @@ void main() {
     linearMotion.startWorld = roundedWorldPoint(simulationPoints[0]);
     linearMotion.endWorld = roundedWorldPoint(simulationPoints[simulationPoints.length - 1]);
     linearMotion.startState = verticalPoseState();
+    resetLinearIkHistory();
     linearMotion.progress = 0;
     syncLinearPointInputs("startWorld");
     syncLinearPointInputs("endWorld");
@@ -28442,6 +28507,7 @@ void main() {
     linearMotion.pathPoints = null;
     linearMotion.pathSourceName = "";
     linearMotion.pathStatus = "\u672A\u5BFC\u5165\u8DEF\u5F84\u6587\u4EF6";
+    resetLinearIkHistory();
     linearMotion.progress = 0;
     syncLinearReadouts();
     runLinearMotion();
@@ -28482,20 +28548,27 @@ void main() {
   function runLinearMotion({ resetToStartState = false } = {}) {
     if (resetToStartState && linearMotion.startState) {
       Object.assign(state, clampState(linearMotion.startState));
+      resetLinearIkHistory();
     }
     if (importedLinearPathActive() && linearMotion.startState && linearMotion.progress <= 1e-3) {
       Object.assign(state, clampState(linearMotion.startState));
+      resetLinearIkHistory();
       update(0);
       return;
     }
-    const solved = solveStateForWorldDisplayedToolTarget(linearTargetFromProgress(), state, TOOL_BALL_STICK_OFFSET_MM);
+    const solved = solveStateForWorldDisplayedToolTarget(linearTargetFromProgress(), state, TOOL_BALL_STICK_OFFSET_MM, {
+      ikMode: linearMotion.ikMode,
+      previousDelta: linearMotion.previousIkDelta
+    });
     Object.assign(state, solved.state);
+    linearMotion.previousIkDelta = solved.delta || linearMotion.previousIkDelta;
     applyToolVerticalConstraint();
     update(solved.error);
   }
   function setLinearProgress(value) {
     stopLinearSimulation();
     linearMotion.progress = clamp2(Number(value), 0, 100);
+    resetLinearIkHistory();
     runLinearMotion({ resetToStartState: importedLinearPathActive() });
   }
   function stopLinearSimulation() {
@@ -28513,6 +28586,7 @@ void main() {
     const pathDistance = linearPathDistance();
     if (pathDistance < 1e-3) return;
     if (linearMotion.startState) Object.assign(state, clampState(linearMotion.startState));
+    resetLinearIkHistory();
     linearMotion.progress = 0;
     runLinearMotion();
     linearMotion.startedAt = performance.now();
@@ -28604,14 +28678,19 @@ void main() {
   function setLinearDraggedTarget(worldPoint) {
     if (!linearMotion.startWorld) return;
     stopLinearSimulation();
+    resetLinearIkHistory();
     if (importedLinearPathActive()) {
       linearMotion.pathPoints = null;
       linearMotion.pathSourceName = "";
       linearMotion.pathStatus = "\u5DF2\u5207\u56DE\u62D6\u62FD\u7EC8\u70B9\u8DEF\u5F84";
     }
     const targetWorld = roundedWorldPoint(worldPoint);
-    const solved = solveStateForWorldDisplayedToolTarget(targetWorld, state, TOOL_BALL_STICK_OFFSET_MM);
+    const solved = solveStateForWorldDisplayedToolTarget(targetWorld, state, TOOL_BALL_STICK_OFFSET_MM, {
+      ikMode: linearMotion.ikMode,
+      previousDelta: linearMotion.previousIkDelta
+    });
     Object.assign(state, solved.state);
+    linearMotion.previousIkDelta = solved.delta || linearMotion.previousIkDelta;
     applyToolVerticalConstraint();
     linearMotion.endWorld = targetWorld;
     linearMotion.progress = 100;
