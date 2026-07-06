@@ -1,6 +1,6 @@
 import { readFileSync } from "node:fs";
 
-const pathFile = "outputs/html-version/assets/paths/cuboid-4000x2700x3300-layer20-y3600-viewXYZ.csv";
+const pathFile = "outputs/html-version/assets/paths/cuboid-4000x2700x3300-layer200-y3600-viewXYZ.csv";
 const raw = readFileSync(pathFile, "utf8").trim();
 const lines = raw.split(/\r?\n/);
 const [header, ...body] = lines;
@@ -66,8 +66,8 @@ function segmentKey(a, b) {
   return first < second ? `${first}|${second}` : `${second}|${first}`;
 }
 
-const expectedLayers = 166;
-const expectedLayerHeight = 20;
+const expectedLayers = 18;
+const expectedLayerHeight = 200;
 const errors = [];
 const layerEntries = [...byLayer.entries()].sort((a, b) => Number(a[0]) - Number(b[0]));
 
@@ -78,7 +78,7 @@ if (layerEntries.length !== expectedLayers) {
 for (let layerIndex = 0; layerIndex < layerEntries.length; layerIndex += 1) {
   const [zKey, layer] = layerEntries[layerIndex];
   const z = Number(zKey);
-  const expectedZ = layerIndex * expectedLayerHeight;
+  const expectedZ = layerIndex === layerEntries.length - 1 ? 3300 : layerIndex * expectedLayerHeight;
   if (!nearlyEqual(z, expectedZ)) errors.push(`Layer ${layerIndex} expected Z=${expectedZ}, found ${z}`);
   if (layer.length < 4) {
     errors.push(`Layer Z=${z} has too few points for a closed one-stroke outline`);

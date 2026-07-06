@@ -30,7 +30,7 @@ import {
   sceneToDevicePointData,
 } from "./coordinates.mjs";
 
-const SCRIPT_VERSION = "20260706-tool-range";
+const SCRIPT_VERSION = "20260706-layer200-path";
 const RENDER_SCALE = 1 / 1000;
 const QT_STAGE_MODE = new URLSearchParams(window.location.search).has("qtStage");
 if (QT_STAGE_MODE) document.documentElement.dataset.qtStage = "true";
@@ -41,8 +41,8 @@ const TOOL_BALL_STICK_OFFSET_MM = { x: 0, y: 262, z: 0 };
 const IMPORTED_PATH_LINE_WIDTH_PX = 5;
 const IMPORTED_REMAINING_PATH_LINE_WIDTH_PX = 2;
 const IMPORTED_REMAINING_PATH_OPACITY = 0.05;
-const DEFAULT_IMPORTED_PATH_URL = "assets/paths/cuboid-4000x2700x3300-layer20-y3600-viewXYZ.csv";
-const DEFAULT_IMPORTED_PATH_NAME = "cuboid-4000x2700x3300-layer20-y3600-viewXYZ.csv";
+const DEFAULT_IMPORTED_PATH_URL = "assets/paths/cuboid-4000x2700x3300-layer200-y3600-viewXYZ.csv";
+const DEFAULT_IMPORTED_PATH_NAME = "cuboid-4000x2700x3300-layer200-y3600-viewXYZ.csv";
 const SHOW_BALL_STICK_BASE = false;
 const SHOW_ARM1_ANCHOR_GUIDE = false;
 const ARM1_MODEL_REFERENCE_STATE = { visible: true, x: -3050, y: -135, z: -1590, rx: 0, ry: 0, rz: -90, scale: 1, unitScale: 1 };
@@ -401,7 +401,7 @@ const linearMotion = {
   pathSourceName: "",
   pathStatus: "未导入路径文件",
   ikMode: "original",
-  previousIkDelta: { arm1: 0, arm2: 0, arm3: 0 },
+  previousIkDelta: { base: 0, arm1: 0, arm2: 0, arm3: 0, offset: 0 },
   progress: 0,
   speed: 500,
   animationFrame: null,
@@ -1445,6 +1445,7 @@ function createLinearControls() {
       <label>IK算法
         <select id="linearIkMode">
           <option value="original">Original</option>
+          <option value="balanced">Balanced</option>
           <option value="improved">Improved</option>
         </select>
       </label>
@@ -1511,7 +1512,7 @@ function createLinearControls() {
   });
   document.querySelector("#linearIkMode").addEventListener("change", (event) => {
     stopLinearSimulation();
-    linearMotion.ikMode = event.target.value === "improved" ? "improved" : "original";
+    linearMotion.ikMode = ["balanced", "improved"].includes(event.target.value) ? event.target.value : "original";
     resetLinearIkHistory();
     runLinearMotion({ resetToStartState: importedLinearPathActive() });
   });
@@ -1556,7 +1557,7 @@ function linearPathDistance() {
 }
 
 function resetLinearIkHistory() {
-  linearMotion.previousIkDelta = { arm1: 0, arm2: 0, arm3: 0 };
+  linearMotion.previousIkDelta = { base: 0, arm1: 0, arm2: 0, arm3: 0, offset: 0 };
 }
 
 function pathDistanceForPoints(points) {

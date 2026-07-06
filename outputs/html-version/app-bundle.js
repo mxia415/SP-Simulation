@@ -26361,11 +26361,32 @@ void main() {
   };
   var IK_MODES = {
     original: { key: "original", label: "Original" },
+    balanced: { key: "balanced", label: "Balanced" },
     improved: { key: "improved", label: "Improved" }
   };
-  var IMPROVED_IK_REFERENCE_DEG = { arm1: 30, arm2: 0, arm3: -180 };
-  var IMPROVED_IK_POSTURE_GAMMA = 5;
-  var IMPROVED_IK_SMOOTHNESS_MU = 3;
+  var IK_CONTINUITY_WEIGHTS = { base: 0.02, arm1: 0.08, arm2: 0.04, arm3: 0.04, offset: 0.02 };
+  var IK_DQ_LIMIT_DEG = { base: 2, arm1: 6, arm2: 6, arm3: 6, offset: 2 };
+  var IK_REFERENCE_DEG = { base: 0, arm1: 90, arm2: 120, arm3: 60, offset: 0 };
+  var BALANCED_IK_PARAMS = {
+    continuityScale: 0.6,
+    postureGamma: 1.5,
+    smoothnessMu: 1.2,
+    referenceDeg: { ...IK_REFERENCE_DEG }
+  };
+  var IMPROVED_IK_PARAMS = {
+    continuityScale: 0.3,
+    postureGamma: 5,
+    smoothnessMu: 3,
+    referenceDeg: { ...IK_REFERENCE_DEG }
+  };
+  var IMPROVED_IK_REFERENCE_DEG = {
+    arm1: IK_REFERENCE_DEG.arm1,
+    arm2: IK_REFERENCE_DEG.arm2,
+    arm3: IK_REFERENCE_DEG.arm3,
+    offset: IK_REFERENCE_DEG.offset
+  };
+  var IMPROVED_IK_POSTURE_GAMMA = IMPROVED_IK_PARAMS.postureGamma;
+  var IMPROVED_IK_SMOOTHNESS_MU = IMPROVED_IK_PARAMS.smoothnessMu;
   var JOINTS = {
     baseArm1: { x: -450.742, y: 0, z: 385.188, name: "\u5E95\u5EA7-\u81C21\u65CB\u8F6C\u8F74\u5FC3" },
     arm1Arm2: { x: -450.742, y: 0, z: 3782.1, name: "\u81C21-\u81C22\u65CB\u8F6C\u8F74\u5FC3" },
@@ -26784,30 +26805,108 @@ void main() {
     return actuatorStrokeViolationForPose(computePose(state2));
   }
   function normalizedIkMode(mode) {
-    return mode === IK_MODES.improved.key ? IK_MODES.improved.key : IK_MODES.original.key;
+    if (mode === IK_MODES.balanced.key) return IK_MODES.balanced.key;
+    if (mode === IK_MODES.improved.key) return IK_MODES.improved.key;
+    return IK_MODES.original.key;
   }
-  function relativeIkAnglesDeg(state2) {
+  function ikDeltaDeg(candidate, currentState) {
     return {
-      arm1: state2.arm1,
-      arm2: -state2.arm2,
-      arm3: -state2.arm3
+      base: angleDistance(candidate.base, currentState.base),
+      arm1: angleDistance(candidate.arm1, currentState.arm1),
+      arm2: angleDistance(candidate.arm2, currentState.arm2),
+      arm3: angleDistance(candidate.arm3, currentState.arm3),
+      offset: angleDistance(candidate.offset, currentState.offset)
     };
   }
-  function relativeIkDeltaDeg(candidate, currentState) {
-    const q = relativeIkAnglesDeg(candidate);
-    const current = relativeIkAnglesDeg(currentState);
-    return {
-      arm1: q.arm1 - current.arm1,
-      arm2: q.arm2 - current.arm2,
-      arm3: q.arm3 - current.arm3
-    };
-  }
-  function improvedIkPenalty(candidate, currentState, previousDelta = {}) {
-    const q = relativeIkAnglesDeg(candidate);
-    const dq = relativeIkDeltaDeg(candidate, currentState);
-    const posture = ((q.arm1 - IMPROVED_IK_REFERENCE_DEG.arm1) ** 2 + (q.arm2 - IMPROVED_IK_REFERENCE_DEG.arm2) ** 2 + (q.arm3 - IMPROVED_IK_REFERENCE_DEG.arm3) ** 2) * IMPROVED_IK_POSTURE_GAMMA * 0.01;
-    const smoothness = ((dq.arm1 - (previousDelta.arm1 || 0)) ** 2 + (dq.arm2 - (previousDelta.arm2 || 0)) ** 2 + (dq.arm3 - (previousDelta.arm3 || 0)) ** 2) * IMPROVED_IK_SMOOTHNESS_MU * 0.01;
+  function postureSmoothnessPenalty(candidate, currentState, previousDelta = {}, params) {
+    const dq = ikDeltaDeg(candidate, currentState);
+    const reference = params.referenceDeg;
+    const posture = ((candidate.base - reference.base) ** 2 + (candidate.arm1 - reference.arm1) ** 2 + (candidate.arm2 - reference.arm2) ** 2 + (candidate.arm3 - reference.arm3) ** 2 + (candidate.offset - reference.offset) ** 2) * params.postureGamma * 0.01;
+    const smoothness = ((dq.base - (previousDelta.base || 0)) ** 2 + (dq.arm1 - (previousDelta.arm1 || 0)) ** 2 + (dq.arm2 - (previousDelta.arm2 || 0)) ** 2 + (dq.arm3 - (previousDelta.arm3 || 0)) ** 2 + (dq.offset - (previousDelta.offset || 0)) ** 2) * params.smoothnessMu * 0.01;
     return { posture, smoothness };
+  }
+  function ikContinuityPenalty(state2, currentState) {
+    return Math.abs(angleDistance(state2.base, currentState.base)) * IK_CONTINUITY_WEIGHTS.base + Math.abs(angleDistance(state2.arm1, currentState.arm1)) * IK_CONTINUITY_WEIGHTS.arm1 + Math.abs(angleDistance(state2.arm2, currentState.arm2)) * IK_CONTINUITY_WEIGHTS.arm2 + Math.abs(angleDistance(state2.arm3, currentState.arm3)) * IK_CONTINUITY_WEIGHTS.arm3 + Math.abs(angleDistance(state2.offset, currentState.offset)) * IK_CONTINUITY_WEIGHTS.offset;
+  }
+  function ikModeParams(ikMode) {
+    if (ikMode === IK_MODES.balanced.key) return BALANCED_IK_PARAMS;
+    if (ikMode === IK_MODES.improved.key) return IMPROVED_IK_PARAMS;
+    return null;
+  }
+  function ikScoreFromDistance(distance2, state2, currentState, previousDelta, ikMode) {
+    const actuatorPenalty = actuatorStrokeViolationForState(state2) * 1e3;
+    const continuity = ikContinuityPenalty(state2, currentState);
+    const params = ikModeParams(ikMode);
+    if (!params) return distance2 + continuity + actuatorPenalty;
+    const penalty = postureSmoothnessPenalty(state2, currentState, previousDelta, params);
+    return distance2 + continuity * params.continuityScale + penalty.posture + penalty.smoothness + actuatorPenalty;
+  }
+  function squaredSum(values) {
+    return values.reduce((sum, value) => sum + value * value, 0);
+  }
+  function ikStepMetrics(state2, currentState, previousDelta = {}) {
+    const dq = ikDeltaDeg(state2, currentState);
+    const ddq = {};
+    for (const key of ["base", "arm1", "arm2", "arm3", "offset"]) {
+      ddq[key] = Math.abs((dq[key] || 0) - (previousDelta[key] || 0));
+    }
+    return {
+      mean_abs_ddq_per_joint: { ...ddq },
+      max_abs_ddq_per_joint: { ...ddq },
+      posture_deviation_deg: Math.sqrt(squaredSum([
+        state2.base - IK_REFERENCE_DEG.base,
+        state2.arm1 - IK_REFERENCE_DEG.arm1,
+        state2.arm2 - IK_REFERENCE_DEG.arm2,
+        state2.arm3 - IK_REFERENCE_DEG.arm3,
+        state2.offset - IK_REFERENCE_DEG.offset
+      ])),
+      dq_prev_deviation_deg: Math.sqrt(squaredSum(Object.values(ddq)))
+    };
+  }
+  function applyIkRateLimit(candidate, currentState) {
+    const unclamped = clampState(candidate);
+    const current = clampState(currentState);
+    const delta = ikDeltaDeg(unclamped, current);
+    let scale = 1;
+    for (const key of ["base", "arm1", "arm2", "arm3", "offset"]) {
+      const absDelta = Math.abs(delta[key] || 0);
+      const limit = IK_DQ_LIMIT_DEG[key];
+      if (absDelta > limit) scale = Math.min(scale, limit / absDelta);
+    }
+    if (scale >= 1) return { state: unclamped, delta, rateLimitScale: 1, rateLimited: false };
+    const limited = clampState({
+      base: wrapDegrees(current.base + delta.base * scale),
+      arm1: current.arm1 + delta.arm1 * scale,
+      arm2: current.arm2 + delta.arm2 * scale,
+      arm3: current.arm3 + delta.arm3 * scale,
+      offset: current.offset + delta.offset * scale
+    });
+    return {
+      state: limited,
+      delta: ikDeltaDeg(limited, current),
+      rateLimitScale: scale,
+      rateLimited: true
+    };
+  }
+  function finalizeIkSolution(candidate, currentState, target, score, ikMode, bestScore, previousDelta = {}) {
+    const limited = applyIkRateLimit(candidate, currentState);
+    const pose = computePose(limited.state);
+    const finalScore = score(limited.state);
+    const metrics = ikStepMetrics(limited.state, currentState, previousDelta);
+    return {
+      state: limited.state,
+      pose,
+      target,
+      error: finalScore,
+      rawError: score(candidate),
+      ikMode,
+      delta: limited.delta,
+      rateLimited: limited.rateLimited,
+      rateLimitScale: limited.rateLimitScale,
+      metrics,
+      actuatorViolation: actuatorStrokeViolationForPose(pose),
+      reachable: bestScore < 35 && finalScore < 35
+    };
   }
   function stateForActuatorStroke(key, normalizedStroke, currentState) {
     const limits = ACTUATOR_STROKE_LIMITS[key];
@@ -26859,13 +26958,7 @@ void main() {
     const score = (state2) => {
       const displayTip = worldDisplayedToolPointForState(state2, displayOffset);
       const distance2 = Math.hypot(displayTip.x - target.x, displayTip.y - target.y, displayTip.z - target.z);
-      const actuatorPenalty = actuatorStrokeViolationForState(state2) * 1e3;
-      const continuity = Math.abs(angleDistance(state2.arm1, currentState.arm1)) * 0.08 + Math.abs(angleDistance(state2.arm2, currentState.arm2)) * 0.04 + Math.abs(angleDistance(state2.arm3, currentState.arm3)) * 0.04 + Math.abs(angleDistance(state2.base, currentState.base)) * 0.04;
-      if (ikMode === IK_MODES.improved.key) {
-        const improvedPenalty = improvedIkPenalty(state2, currentState, previousDelta);
-        return distance2 + continuity * 0.3 + improvedPenalty.posture + improvedPenalty.smoothness + actuatorPenalty;
-      }
-      return distance2 + continuity + actuatorPenalty;
+      return ikScoreFromDistance(distance2, state2, currentState, previousDelta, ikMode);
     };
     let bestScore = score(candidate);
     for (let iteration = 0; iteration < 240; iteration += 1) {
@@ -26885,18 +26978,7 @@ void main() {
       if (!improved) step *= 0.62;
       if (step < 0.05) break;
     }
-    const pose = computePose(candidate);
-    const delta = relativeIkDeltaDeg(candidate, currentState);
-    return {
-      state: candidate,
-      pose,
-      target,
-      error: score(candidate),
-      ikMode,
-      delta,
-      actuatorViolation: actuatorStrokeViolationForPose(pose),
-      reachable: bestScore < 35
-    };
+    return finalizeIkSolution(candidate, currentState, target, score, ikMode, bestScore, previousDelta);
   }
 
   // outputs/html-version/coordinates.mjs
@@ -26918,7 +27000,7 @@ void main() {
   }
 
   // outputs/html-version/app.mjs
-  var SCRIPT_VERSION = "20260706-tool-range";
+  var SCRIPT_VERSION = "20260706-layer200-path";
   var RENDER_SCALE = 1 / 1e3;
   var QT_STAGE_MODE = new URLSearchParams(window.location.search).has("qtStage");
   if (QT_STAGE_MODE) document.documentElement.dataset.qtStage = "true";
@@ -26929,8 +27011,8 @@ void main() {
   var IMPORTED_PATH_LINE_WIDTH_PX = 5;
   var IMPORTED_REMAINING_PATH_LINE_WIDTH_PX = 2;
   var IMPORTED_REMAINING_PATH_OPACITY = 0.05;
-  var DEFAULT_IMPORTED_PATH_URL = "assets/paths/cuboid-4000x2700x3300-layer20-y3600-viewXYZ.csv";
-  var DEFAULT_IMPORTED_PATH_NAME = "cuboid-4000x2700x3300-layer20-y3600-viewXYZ.csv";
+  var DEFAULT_IMPORTED_PATH_URL = "assets/paths/cuboid-4000x2700x3300-layer200-y3600-viewXYZ.csv";
+  var DEFAULT_IMPORTED_PATH_NAME = "cuboid-4000x2700x3300-layer200-y3600-viewXYZ.csv";
   var SHOW_BALL_STICK_BASE = false;
   var SHOW_ARM1_ANCHOR_GUIDE = false;
   var ARM1_MODEL_REFERENCE_STATE = { visible: true, x: -3050, y: -135, z: -1590, rx: 0, ry: 0, rz: -90, scale: 1, unitScale: 1 };
@@ -27266,7 +27348,7 @@ void main() {
     pathSourceName: "",
     pathStatus: "\u672A\u5BFC\u5165\u8DEF\u5F84\u6587\u4EF6",
     ikMode: "original",
-    previousIkDelta: { arm1: 0, arm2: 0, arm3: 0 },
+    previousIkDelta: { base: 0, arm1: 0, arm2: 0, arm3: 0, offset: 0 },
     progress: 0,
     speed: 500,
     animationFrame: null,
@@ -28210,6 +28292,7 @@ void main() {
       <label>IK\u7B97\u6CD5
         <select id="linearIkMode">
           <option value="original">Original</option>
+          <option value="balanced">Balanced</option>
           <option value="improved">Improved</option>
         </select>
       </label>
@@ -28275,7 +28358,7 @@ void main() {
     });
     document.querySelector("#linearIkMode").addEventListener("change", (event) => {
       stopLinearSimulation();
-      linearMotion.ikMode = event.target.value === "improved" ? "improved" : "original";
+      linearMotion.ikMode = ["balanced", "improved"].includes(event.target.value) ? event.target.value : "original";
       resetLinearIkHistory();
       runLinearMotion({ resetToStartState: importedLinearPathActive() });
     });
@@ -28312,7 +28395,7 @@ void main() {
     return pathDistanceForPoints(activeLinearPathPoints());
   }
   function resetLinearIkHistory() {
-    linearMotion.previousIkDelta = { arm1: 0, arm2: 0, arm3: 0 };
+    linearMotion.previousIkDelta = { base: 0, arm1: 0, arm2: 0, arm3: 0, offset: 0 };
   }
   function pathDistanceForPoints(points) {
     let total = 0;

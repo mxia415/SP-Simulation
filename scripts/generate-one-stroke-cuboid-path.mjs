@@ -1,6 +1,6 @@
 import { writeFileSync } from "node:fs";
 
-const outputFile = "outputs/html-version/assets/paths/cuboid-4000x2700x3300-layer20-y3600-viewXYZ.csv";
+const outputFile = "outputs/html-version/assets/paths/cuboid-4000x2700x3300-layer200-y3600-viewXYZ.csv";
 
 const minX = 3600;
 const maxX = 6300;
@@ -8,8 +8,10 @@ const minY = -2000;
 const maxY = 2000;
 const minZ = 0;
 const maxZ = 3300;
-const layerHeight = 20;
-const layerCount = Math.round((maxZ - minZ) / layerHeight) + 1;
+const layerHeight = 200;
+const layerZValues = [];
+for (let z = minZ; z <= maxZ; z += layerHeight) layerZValues.push(z);
+if (layerZValues[layerZValues.length - 1] !== maxZ) layerZValues.push(maxZ);
 
 function round(value) {
   return Number(value.toFixed(2));
@@ -39,8 +41,8 @@ function layerOutline(z, layerIndex) {
 }
 
 const rows = [["x", "y", "z"]];
-for (let layerIndex = 0; layerIndex < layerCount; layerIndex += 1) {
-  const z = minZ + layerIndex * layerHeight;
+for (let layerIndex = 0; layerIndex < layerZValues.length; layerIndex += 1) {
+  const z = layerZValues[layerIndex];
   for (const row of layerOutline(z, layerIndex)) rows.push(row);
 }
 
@@ -49,7 +51,7 @@ writeFileSync(outputFile, `${rows.map((row) => row.join(",")).join("\n")}\n`);
 console.log(JSON.stringify({
   outputFile,
   points: rows.length - 1,
-  layers: layerCount,
+  layers: layerZValues.length,
   layerHeight,
   xRange: [minX, maxX],
   yRange: [minY, maxY],

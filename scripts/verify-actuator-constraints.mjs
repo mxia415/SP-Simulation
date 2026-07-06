@@ -1,7 +1,13 @@
 import assert from "node:assert/strict";
 import {
   ACTUATOR_STROKE_LIMITS,
+  BALANCED_IK_PARAMS,
   DEFAULT_STATE,
+  IK_DQ_LIMIT_DEG,
+  IK_MODES,
+  IK_CONTINUITY_WEIGHTS,
+  IMPROVED_IK_REFERENCE_DEG,
+  IMPROVED_IK_PARAMS,
   LIMITS,
   clampState,
   computePose,
@@ -20,6 +26,50 @@ assert.deepEqual(
 );
 assert.equal(clampState({ ...DEFAULT_STATE, offset: -120 }).offset, -60, "print head min clamp");
 assert.equal(clampState({ ...DEFAULT_STATE, offset: 120 }).offset, 85, "print head max clamp");
+assert.deepEqual(
+  IMPROVED_IK_REFERENCE_DEG,
+  { arm1: 90, arm2: 120, arm3: 60, offset: 0 },
+  "HTML Improved IK posture reference should match the restored Python strategy",
+);
+assert.deepEqual(
+  IK_CONTINUITY_WEIGHTS,
+  { base: 0.02, arm1: 0.08, arm2: 0.04, arm3: 0.04, offset: 0.02 },
+  "HTML IK continuity weights should match the restored Python strategy",
+);
+assert.deepEqual(
+  IK_MODES,
+  {
+    original: { key: "original", label: "Original" },
+    balanced: { key: "balanced", label: "Balanced" },
+    improved: { key: "improved", label: "Improved" },
+  },
+  "HTML IK modes should expose Original, Balanced, and Improved without marking Improved as recommended",
+);
+assert.deepEqual(
+  IK_DQ_LIMIT_DEG,
+  { base: 2, arm1: 6, arm2: 6, arm3: 6, offset: 2 },
+  "HTML IK rate limiter should match the requested per-joint limits",
+);
+assert.deepEqual(
+  BALANCED_IK_PARAMS,
+  {
+    continuityScale: 0.6,
+    postureGamma: 1.5,
+    smoothnessMu: 1.2,
+    referenceDeg: { base: 0, arm1: 90, arm2: 120, arm3: 60, offset: 0 },
+  },
+  "Balanced IK parameters should match the requested scoring strategy",
+);
+assert.deepEqual(
+  IMPROVED_IK_PARAMS,
+  {
+    continuityScale: 0.3,
+    postureGamma: 5,
+    smoothnessMu: 3,
+    referenceDeg: { base: 0, arm1: 90, arm2: 120, arm3: 60, offset: 0 },
+  },
+  "Improved IK should remain the strong posture-biased comparison strategy",
+);
 
 function actuatorLength(state, key) {
   return computePose(state).actuators[key].instances[0].length;
@@ -69,5 +119,46 @@ const improvedIk = solveStateForWorldDisplayedToolTarget(ikTarget, DEFAULT_STATE
 });
 assert.equal(improvedIk.ikMode, "improved", "improved IK mode should be reported");
 assert.ok(improvedIk.delta && Number.isFinite(improvedIk.delta.arm2), "improved IK should return a joint delta");
+
+const balancedIk = solveStateForWorldDisplayedToolTarget(ikTarget, DEFAULT_STATE, { x: 0, y: 262, z: 0 }, {
+  ikMode: "balanced",
+  previousDelta: originalIk.delta,
+});
+assert.equal(balancedIk.ikMode, "balanced", "balanced IK mode should be reported");
+assert.ok(balancedIk.delta && Number.isFinite(balancedIk.delta.arm3), "balanced IK should return a joint delta");
+assert.ok(
+  balancedIk.metrics && Number.isFinite(balancedIk.metrics.posture_deviation_deg),
+  "balanced IK should return evaluation metrics",
+);
+for (const key of ["base", "arm1", "arm2", "arm3", "offset"]) {
+  assert.ok(
+    Number.isFinite(balancedIk.metrics.mean_abs_ddq_per_joint[key]) &&
+      Number.isFinite(balancedIk.metrics.max_abs_ddq_per_joint[key]),
+    `${key} IK metrics should include per-joint acceleration change`,
+  );
+}
+assert.ok(
+  Number.isFinite(balancedIk.metrics.dq_prev_deviation_deg),
+  "IK metrics should include previous-delta deviation",
+);
+
+const fallbackIk = solveStateForWorldDisplayedToolTarget(ikTarget, DEFAULT_STATE, { x: 0, y: 262, z: 0 }, {
+  ikMode: "unknown-mode",
+});
+assert.equal(fallbackIk.ikMode, "original", "unknown IK mode should fall back to Original");
+
+const rateLimitedTarget = worldDisplayedToolPointForState(
+  { arm1: 45, arm2: 150, arm3: 30, offset: 50, base: -90 },
+  { x: 0, y: 262, z: 0 },
+);
+const rateLimitedIk = solveStateForWorldDisplayedToolTarget(rateLimitedTarget, DEFAULT_STATE, { x: 0, y: 262, z: 0 }, {
+  ikMode: "original",
+});
+for (const key of ["base", "arm1", "arm2", "arm3", "offset"]) {
+  assert.ok(
+    Math.abs(rateLimitedIk.delta[key]) <= IK_DQ_LIMIT_DEG[key] + 0.001,
+    `${key} IK output delta should be rate limited to ${IK_DQ_LIMIT_DEG[key]} deg, got ${rateLimitedIk.delta[key]}`,
+  );
+}
 
 console.log("Actuator constraint verification passed.");

@@ -75,7 +75,7 @@ try {
   await page.goto(targetUrl, { waitUntil: "domcontentloaded" });
   await page.waitForFunction(() => window.__lingzhuDebug && window.__spsQtStage, null, { timeout: 30000 });
   await page.waitForFunction(
-    () => window.__lingzhuDebug?.importedLinearPath?.sourceName === "cuboid-4000x2700x3300-layer20-y3600-viewXYZ.csv",
+    () => window.__lingzhuDebug?.importedLinearPath?.sourceName === "cuboid-4000x2700x3300-layer200-y3600-viewXYZ.csv",
     null,
     { timeout: 10000 },
   );
@@ -86,6 +86,10 @@ try {
     pointCount: document.querySelector("#linearPathPointCount")?.value,
     status: document.querySelector("#linearPathStatus")?.value,
     ikMode: document.querySelector("#linearIkMode")?.value,
+    ikModeOptions: Array.from(document.querySelectorAll("#linearIkMode option")).map((option) => ({
+      value: option.value,
+      label: option.textContent,
+    })),
     toolRange: {
       sliderMin: document.querySelector("#offset")?.min,
       sliderMax: document.querySelector("#offset")?.max,
@@ -96,11 +100,18 @@ try {
     pathRender: window.__lingzhuDebug.pathRender,
   }));
 
-  if (!defaultResult.modeButtonActive || !defaultResult.debug?.active || defaultResult.debug?.pointCount !== 1163) {
+  if (!defaultResult.modeButtonActive || !defaultResult.debug?.active || defaultResult.debug?.pointCount !== 127) {
     throw new Error(`Default cuboid path must be imported on startup: ${JSON.stringify(defaultResult, null, 2)}`);
   }
   if (defaultResult.ikMode !== "original") {
     throw new Error(`Default IK mode must be Original: ${JSON.stringify(defaultResult, null, 2)}`);
+  }
+  if (JSON.stringify(defaultResult.ikModeOptions) !== JSON.stringify([
+    { value: "original", label: "Original" },
+    { value: "balanced", label: "Balanced" },
+    { value: "improved", label: "Improved" },
+  ])) {
+    throw new Error(`IK selector must expose Original, Balanced, Improved without recommendation labels: ${JSON.stringify(defaultResult, null, 2)}`);
   }
   if (defaultResult.pathRender?.pointMarkers !== 0) {
     throw new Error(`Default imported cuboid path must not show point markers: ${JSON.stringify(defaultResult, null, 2)}`);
@@ -206,11 +217,34 @@ try {
     Math.abs(result.pose?.arm3 - 90) < 0.01 &&
     Math.abs(result.pose?.base) < 0.01;
   const solveError = Number.parseFloat(result.solveErrorText || "NaN");
-  if (poseStillVertical || !Number.isFinite(solveError) || solveError > 100) {
-    throw new Error(`Imported CSV progress must solve a non-vertical pose with low error: ${JSON.stringify(result, null, 2)}`);
+  const deltasWithinRateLimit = ["base", "arm1", "arm2", "arm3", "offset"].every((key) => {
+    const limit = { base: 2, arm1: 6, arm2: 6, arm3: 6, offset: 2 }[key];
+    return Math.abs(Number(result.linearMotion?.previousIkDelta?.[key] || 0)) <= limit + 0.001;
+  });
+  if (poseStillVertical || !Number.isFinite(solveError) || !deltasWithinRateLimit) {
+    throw new Error(`Imported CSV progress must solve a non-vertical rate-limited pose: ${JSON.stringify(result, null, 2)}`);
   }
   if (!result.coordinateSystem?.includes("3D视角 X/Y/Z") || !result.coordinateNote?.includes("Z为高度")) {
     throw new Error(`Coordinate note verification failed: ${JSON.stringify(result, null, 2)}`);
+  }
+
+  await page.selectOption("#linearIkMode", "balanced");
+  await page.fill("#linearProgressNumber", "50");
+  await page.dispatchEvent("#linearProgressNumber", "change");
+  const balancedResult = await page.evaluate(() => ({
+    ikMode: document.querySelector("#linearIkMode")?.value,
+    linearMotion: window.__lingzhuDebug.linearMotion,
+    solveErrorText: document.querySelector("#linearSolveError")?.value,
+    bootErrors: window.__lingzhuBootErrors,
+  }));
+  if (balancedResult.bootErrors?.length) {
+    throw new Error(`Balanced IK switch produced boot errors: ${JSON.stringify(balancedResult, null, 2)}`);
+  }
+  if (balancedResult.ikMode !== "balanced" || balancedResult.linearMotion?.ikMode !== "balanced") {
+    throw new Error(`Balanced IK mode must be selectable and reflected in debug state: ${JSON.stringify(balancedResult, null, 2)}`);
+  }
+  if (!Number.isFinite(balancedResult.linearMotion?.previousIkDelta?.arm1)) {
+    throw new Error(`Balanced IK simulation must retain previous joint delta: ${JSON.stringify(balancedResult, null, 2)}`);
   }
 
   await page.selectOption("#linearIkMode", "improved");
@@ -251,7 +285,7 @@ try {
   const poseMatchesStart = stateKeys.every(
     (key) => Math.abs(Number(returnedResult.state?.[key]) - Number(returnedResult.startState?.[key])) < 0.001,
   );
-  const ikHistoryCleared = ["arm1", "arm2", "arm3"].every(
+  const ikHistoryCleared = ["base", "arm1", "arm2", "arm3", "offset"].every(
     (key) => Math.abs(Number(returnedResult.previousIkDelta?.[key])) < 0.001,
   );
   if (returnedResult.progress !== 0 || returnedResult.progressInput !== "0" || !poseMatchesStart || !ikHistoryCleared) {
