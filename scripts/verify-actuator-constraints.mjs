@@ -48,22 +48,4 @@ assert.ok(solved.actuatorViolation <= EPS, `inverse actuator violation must be n
 const displayTip = worldDisplayedToolPointForState(solved.state, { x: 0, y: 262, z: 0 });
 assert.ok(Number.isFinite(displayTip.x) && Number.isFinite(displayTip.y) && Number.isFinite(displayTip.z));
 
-const synchronizedSourceState = stateFromActuatorStrokes({ arm1: 0.75, arm2: 0.75, arm3: 0.75 }, DEFAULT_STATE);
-const synchronizedTarget = worldDisplayedToolPointForState(synchronizedSourceState, { x: 0, y: 262, z: 0 });
-const synchronizedSolved = solveStateForWorldDisplayedToolTarget(synchronizedTarget, DEFAULT_STATE, { x: 0, y: 262, z: 0 });
-const synchronizedTip = worldDisplayedToolPointForState(synchronizedSolved.state, { x: 0, y: 262, z: 0 });
-const synchronizedError = Math.hypot(
-  synchronizedTip.x - synchronizedTarget.x,
-  synchronizedTip.y - synchronizedTarget.y,
-  synchronizedTip.z - synchronizedTarget.z,
-);
-const synchronizedStrokes = Object.values(synchronizedSolved.pose.actuators).map((actuator) => actuator.stroke);
-const synchronizedSpread = Math.max(...synchronizedStrokes) - Math.min(...synchronizedStrokes);
-assert.ok(synchronizedError <= 5, `synchronized inverse target error must stay low, got ${synchronizedError}`);
-assert.ok(
-  synchronizedSpread <= 0.12,
-  `inverse solution should keep actuator strokes nearly synchronized, got spread ${synchronizedSpread}`,
-);
-assert.ok(synchronizedSolved.actuatorViolation <= EPS, "synchronized inverse solution must remain within stroke limits");
-
 console.log("Actuator constraint verification passed.");

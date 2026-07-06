@@ -61,9 +61,6 @@ export const ACTUATOR_STROKE_LIMITS = {
   arm3: { minLength: 1405.8, strokeLength: 520, label: "电缸3" },
 };
 
-const IK_SYNCHRONIZED_STROKE_PREFERENCE_WEIGHT = 120;
-const IK_SYNCHRONIZED_STROKE_CANDIDATES = [0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1];
-
 Object.values(ACTUATOR_STROKE_LIMITS).forEach((limit) => {
   limit.maxLength = Number((limit.minLength + limit.strokeLength).toFixed(3));
 });
@@ -499,32 +496,8 @@ function actuatorStrokeViolationForPose(pose) {
   return Object.values(pose.actuators).reduce((sum, actuator) => sum + (actuator.violation || 0), 0);
 }
 
-function synchronizedActuatorStrokePenaltyForPose(pose) {
-  const strokes = ["arm1", "arm2", "arm3"].map((key) => pose.actuators?.[key]?.stroke ?? 0);
-  const mean = strokes.reduce((sum, stroke) => sum + stroke, 0) / strokes.length;
-  const spread = Math.max(...strokes) - Math.min(...strokes);
-  const variance = strokes.reduce((sum, stroke) => sum + (stroke - mean) ** 2, 0) / strokes.length;
-  return (spread + variance) * IK_SYNCHRONIZED_STROKE_PREFERENCE_WEIGHT;
-}
-
-function pickBestIkCandidate(candidates, score) {
-  let bestState = clampState(candidates[0] || DEFAULT_STATE);
-  let bestScore = score(bestState);
-  candidates.slice(1).forEach((candidate) => {
-    const state = clampState(candidate);
-    const candidateScore = score(state);
-    if (candidateScore + 0.001 < bestScore) {
-      bestState = state;
-      bestScore = candidateScore;
-    }
-  });
-  return { state: bestState, score: bestScore };
-}
-
-function synchronizedStrokeIkCandidates(currentState) {
-  return IK_SYNCHRONIZED_STROKE_CANDIDATES.map((stroke) =>
-    stateFromActuatorStrokes({ arm1: stroke, arm2: stroke, arm3: stroke }, currentState),
-  );
+function actuatorStrokeViolationForState(state) {
+  return actuatorStrokeViolationForPose(computePose(state));
 }
 
 function stateForActuatorStroke(key, normalizedStroke, currentState) {
@@ -572,23 +545,19 @@ export function solveStateForToolTarget(targetWorld, currentState = DEFAULT_STAT
   let step = 16;
 
   const score = (state) => {
-    const pose = computePose(state);
-    const tip = pose.toolCenter;
+    const tip = computePose(state).toolCenter;
     const rotatedTip = rotateXYAround(tip, referenceBase - state.base);
     const distance = Math.hypot(rotatedTip.x - target.x, rotatedTip.y - target.y, rotatedTip.z - target.z);
-    const actuatorPenalty = actuatorStrokeViolationForPose(pose) * 1000;
-    const synchronizedStrokePreference = synchronizedActuatorStrokePenaltyForPose(pose);
+    const actuatorPenalty = actuatorStrokeViolationForState(state) * 1000;
     const continuity =
       Math.abs(angleDistance(state.arm1, currentState.arm1)) * 0.08 +
       Math.abs(angleDistance(state.arm2, currentState.arm2)) * 0.04 +
       Math.abs(angleDistance(state.arm3, currentState.arm3)) * 0.04 +
       Math.abs(angleDistance(state.base, currentState.base)) * 0.04;
-    return distance + continuity + actuatorPenalty + synchronizedStrokePreference;
+    return distance + continuity + actuatorPenalty;
   };
 
-  const initial = pickBestIkCandidate([candidate, ...synchronizedStrokeIkCandidates(candidate)], score);
-  candidate = initial.state;
-  let bestScore = initial.score;
+  let bestScore = score(candidate);
   for (let iteration = 0; iteration < 240; iteration += 1) {
     let improved = false;
     for (const key of keys) {
@@ -608,16 +577,13 @@ export function solveStateForToolTarget(targetWorld, currentState = DEFAULT_STAT
   }
 
   const pose = computePose(candidate);
-  const finalTip = rotateXYAround(pose.toolCenter, referenceBase - candidate.base);
-  const finalError = Math.hypot(finalTip.x - target.x, finalTip.y - target.y, finalTip.z - target.z);
   return {
     state: candidate,
     pose,
     target,
-    error: finalError,
-    score: score(candidate),
+    error: score(candidate),
     actuatorViolation: actuatorStrokeViolationForPose(pose),
-    reachable: finalError < 35,
+    reachable: bestScore < 35,
   };
 }
 
@@ -633,23 +599,19 @@ export function solveStateForDisplayedToolTarget(targetWorld, currentState = DEF
   let step = 16;
 
   const score = (state) => {
-    const pose = computePose(state);
-    const displayTip = offsetPoint(pose.toolCenter, displayOffset);
+    const displayTip = offsetPoint(computePose(state).toolCenter, displayOffset);
     const rotatedTip = rotateXYAround(displayTip, referenceBase - state.base);
     const distance = Math.hypot(rotatedTip.x - target.x, rotatedTip.y - target.y, rotatedTip.z - target.z);
-    const actuatorPenalty = actuatorStrokeViolationForPose(pose) * 1000;
-    const synchronizedStrokePreference = synchronizedActuatorStrokePenaltyForPose(pose);
+    const actuatorPenalty = actuatorStrokeViolationForState(state) * 1000;
     const continuity =
       Math.abs(angleDistance(state.arm1, currentState.arm1)) * 0.08 +
       Math.abs(angleDistance(state.arm2, currentState.arm2)) * 0.04 +
       Math.abs(angleDistance(state.arm3, currentState.arm3)) * 0.04 +
       Math.abs(angleDistance(state.base, currentState.base)) * 0.04;
-    return distance + continuity + actuatorPenalty + synchronizedStrokePreference;
+    return distance + continuity + actuatorPenalty;
   };
 
-  const initial = pickBestIkCandidate([candidate, ...synchronizedStrokeIkCandidates(candidate)], score);
-  candidate = initial.state;
-  let bestScore = initial.score;
+  let bestScore = score(candidate);
   for (let iteration = 0; iteration < 240; iteration += 1) {
     let improved = false;
     for (const key of keys) {
@@ -669,20 +631,13 @@ export function solveStateForDisplayedToolTarget(targetWorld, currentState = DEF
   }
 
   const pose = computePose(candidate);
-  const finalDisplayTip = rotateXYAround(offsetPoint(pose.toolCenter, displayOffset), referenceBase - candidate.base);
-  const finalError = Math.hypot(
-    finalDisplayTip.x - target.x,
-    finalDisplayTip.y - target.y,
-    finalDisplayTip.z - target.z,
-  );
   return {
     state: candidate,
     pose,
     target,
-    error: finalError,
-    score: score(candidate),
+    error: score(candidate),
     actuatorViolation: actuatorStrokeViolationForPose(pose),
-    reachable: finalError < 35,
+    reachable: bestScore < 35,
   };
 }
 
@@ -704,22 +659,18 @@ export function solveStateForWorldDisplayedToolTarget(targetWorld, currentState 
   let step = 16;
 
   const score = (state) => {
-    const pose = computePose(state);
-    const displayTip = rotateXYAround(offsetPoint(pose.toolCenter, displayOffset), -clampState(state).base);
+    const displayTip = worldDisplayedToolPointForState(state, displayOffset);
     const distance = Math.hypot(displayTip.x - target.x, displayTip.y - target.y, displayTip.z - target.z);
-    const actuatorPenalty = actuatorStrokeViolationForPose(pose) * 1000;
-    const synchronizedStrokePreference = synchronizedActuatorStrokePenaltyForPose(pose);
+    const actuatorPenalty = actuatorStrokeViolationForState(state) * 1000;
     const continuity =
       Math.abs(angleDistance(state.arm1, currentState.arm1)) * 0.08 +
       Math.abs(angleDistance(state.arm2, currentState.arm2)) * 0.04 +
       Math.abs(angleDistance(state.arm3, currentState.arm3)) * 0.04 +
       Math.abs(angleDistance(state.base, currentState.base)) * 0.04;
-    return distance + continuity + actuatorPenalty + synchronizedStrokePreference;
+    return distance + continuity + actuatorPenalty;
   };
 
-  const initial = pickBestIkCandidate([candidate, ...synchronizedStrokeIkCandidates(candidate)], score);
-  candidate = initial.state;
-  let bestScore = initial.score;
+  let bestScore = score(candidate);
   for (let iteration = 0; iteration < 240; iteration += 1) {
     let improved = false;
     for (const key of keys) {
@@ -739,19 +690,12 @@ export function solveStateForWorldDisplayedToolTarget(targetWorld, currentState 
   }
 
   const pose = computePose(candidate);
-  const finalDisplayTip = worldDisplayedToolPointForState(candidate, displayOffset);
-  const finalError = Math.hypot(
-    finalDisplayTip.x - target.x,
-    finalDisplayTip.y - target.y,
-    finalDisplayTip.z - target.z,
-  );
   return {
     state: candidate,
     pose,
     target,
-    error: finalError,
-    score: score(candidate),
+    error: score(candidate),
     actuatorViolation: actuatorStrokeViolationForPose(pose),
-    reachable: finalError < 35,
+    reachable: bestScore < 35,
   };
 }
