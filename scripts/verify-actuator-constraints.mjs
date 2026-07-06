@@ -2,6 +2,8 @@ import assert from "node:assert/strict";
 import {
   ACTUATOR_STROKE_LIMITS,
   DEFAULT_STATE,
+  LIMITS,
+  clampState,
   computePose,
   solveStateForWorldDisplayedToolTarget,
   stateFromActuatorStrokes,
@@ -10,6 +12,14 @@ import {
 
 const EPS = 0.25;
 const EXPECTED_STROKE_LENGTHS = { arm1: 900, arm2: 680, arm3: 520 };
+
+assert.deepEqual(
+  { min: LIMITS.offset.min, max: LIMITS.offset.max },
+  { min: -60, max: 85 },
+  "print head angle range",
+);
+assert.equal(clampState({ ...DEFAULT_STATE, offset: -120 }).offset, -60, "print head min clamp");
+assert.equal(clampState({ ...DEFAULT_STATE, offset: 120 }).offset, 85, "print head max clamp");
 
 function actuatorLength(state, key) {
   return computePose(state).actuators[key].instances[0].length;

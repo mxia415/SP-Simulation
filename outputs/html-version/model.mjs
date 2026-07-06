@@ -2,7 +2,7 @@ export const LIMITS = {
   arm1: { min: 0, max: 128, label: "臂1" },
   arm2: { min: 5, max: 180, label: "臂2" },
   arm3: { min: -10, max: 180, label: "臂3" },
-  offset: { min: -270, max: 210, label: "打印头" },
+  offset: { min: -60, max: 85, label: "打印头" },
   base: { min: -180, max: 180, label: "旋转" },
 };
 

@@ -26335,7 +26335,7 @@ void main() {
     arm1: { min: 0, max: 128, label: "\u81C21" },
     arm2: { min: 5, max: 180, label: "\u81C22" },
     arm3: { min: -10, max: 180, label: "\u81C23" },
-    offset: { min: -270, max: 210, label: "\u6253\u5370\u5934" },
+    offset: { min: -60, max: 85, label: "\u6253\u5370\u5934" },
     base: { min: -180, max: 180, label: "\u65CB\u8F6C" }
   };
   var DEFAULT_STATE = {
@@ -26918,7 +26918,7 @@ void main() {
   }
 
   // outputs/html-version/app.mjs
-  var SCRIPT_VERSION = "20260706-return-to-start";
+  var SCRIPT_VERSION = "20260706-tool-range";
   var RENDER_SCALE = 1 / 1e3;
   var QT_STAGE_MODE = new URLSearchParams(window.location.search).has("qtStage");
   if (QT_STAGE_MODE) document.documentElement.dataset.qtStage = "true";

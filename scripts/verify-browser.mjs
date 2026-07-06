@@ -86,6 +86,12 @@ try {
     pointCount: document.querySelector("#linearPathPointCount")?.value,
     status: document.querySelector("#linearPathStatus")?.value,
     ikMode: document.querySelector("#linearIkMode")?.value,
+    toolRange: {
+      sliderMin: document.querySelector("#offset")?.min,
+      sliderMax: document.querySelector("#offset")?.max,
+      numberMin: document.querySelector("#offsetNumber")?.min,
+      numberMax: document.querySelector("#offsetNumber")?.max,
+    },
     debug: window.__lingzhuDebug.importedLinearPath,
     pathRender: window.__lingzhuDebug.pathRender,
   }));
@@ -98,6 +104,14 @@ try {
   }
   if (defaultResult.pathRender?.pointMarkers !== 0) {
     throw new Error(`Default imported cuboid path must not show point markers: ${JSON.stringify(defaultResult, null, 2)}`);
+  }
+  if (
+    defaultResult.toolRange?.sliderMin !== "-60" ||
+    defaultResult.toolRange?.sliderMax !== "85" ||
+    defaultResult.toolRange?.numberMin !== "-60" ||
+    defaultResult.toolRange?.numberMax !== "85"
+  ) {
+    throw new Error(`Print head controls must expose -60..85 degree range: ${JSON.stringify(defaultResult, null, 2)}`);
   }
 
   const csv = [
