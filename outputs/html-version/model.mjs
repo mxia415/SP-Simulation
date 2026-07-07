@@ -34,6 +34,8 @@ export const IK_MODES = {
   original: { key: "original", label: "Original" },
   balanced: { key: "balanced", label: "Balanced" },
   improved: { key: "improved", label: "Improved" },
+  phiScan: { key: "phi_scan", label: "Phi Scan" },
+  active3Dls: { key: "active3_dls", label: "Active-3 DLS" },
 };
 
 export const IK_CONTINUITY_WEIGHTS = { base: 0.02, arm1: 0.08, arm2: 0.04, arm3: 0.04, offset: 0.02 };
@@ -50,6 +52,29 @@ export const IMPROVED_IK_PARAMS = {
   postureGamma: 5,
   smoothnessMu: 3,
   referenceDeg: { ...IK_REFERENCE_DEG },
+};
+export const PHI_SCAN_IK_PARAMS = {
+  phiMinDeg: -250,
+  phiMaxDeg: 250,
+  phiStepDeg: 1,
+  qRefRelativeDeg: { arm1: 90, arm2: -120, arm3: -60 },
+  wMove: 0.003,
+  wSmooth: 0.03,
+  wPosture: 0.001,
+  wUnreachable: 0.05,
+  ddqLimitDeg: { base: 1, arm1: 2, arm2: 2, arm3: 2, offset: 1 },
+  wBrake: 250,
+};
+export const ACTIVE3_DLS_IK_PARAMS = {
+  Kp: 0.8,
+  maxCartStepMm: 50,
+  damping: 0.12,
+  WDiag: { arm1: 1.2, arm2: 1, arm3: 0.9 },
+  mu: 1.2,
+  gamma: 0.08,
+  qRefActiveDeg: { arm1: 90, arm2: 120, arm3: 60 },
+  dqLimitDeg: { arm1: 4, arm2: 4, arm3: 4 },
+  ddqLimitDeg: { arm1: 1.5, arm2: 1.5, arm3: 1.5 },
 };
 export const IMPROVED_IK_REFERENCE_DEG = {
   arm1: IK_REFERENCE_DEG.arm1,
@@ -533,6 +558,8 @@ function actuatorStrokeViolationForState(state) {
 function normalizedIkMode(mode) {
   if (mode === IK_MODES.balanced.key) return IK_MODES.balanced.key;
   if (mode === IK_MODES.improved.key) return IK_MODES.improved.key;
+  if (mode === IK_MODES.phiScan.key) return IK_MODES.phiScan.key;
+  if (mode === IK_MODES.active3Dls.key) return IK_MODES.active3Dls.key;
   return IK_MODES.original.key;
 }
 
@@ -643,8 +670,31 @@ export function applyIkRateLimit(candidate, currentState) {
   };
 }
 
-function finalizeIkSolution(candidate, currentState, target, score, ikMode, bestScore, previousDelta = {}) {
-  const limited = applyIkRateLimit(candidate, currentState);
+function applyIkAccelerationLimit(candidate, currentState, previousDelta = {}, ddqLimitDeg = {}) {
+  const clamped = clampState(candidate);
+  const current = clampState(currentState);
+  const rawDelta = ikDeltaDeg(clamped, current);
+  const limitedDelta = {};
+  for (const key of ["base", "arm1", "arm2", "arm3", "offset"]) {
+    const previous = previousDelta[key] || 0;
+    const limit = ddqLimitDeg[key] ?? Infinity;
+    limitedDelta[key] = clamp(rawDelta[key], previous - limit, previous + limit);
+  }
+  const state = clampState({
+    base: wrapDegrees(current.base + limitedDelta.base),
+    arm1: current.arm1 + limitedDelta.arm1,
+    arm2: current.arm2 + limitedDelta.arm2,
+    arm3: current.arm3 + limitedDelta.arm3,
+    offset: current.offset + limitedDelta.offset,
+  });
+  return { state, delta: ikDeltaDeg(state, current) };
+}
+
+function finalizeIkSolution(candidate, currentState, target, score, ikMode, bestScore, previousDelta = {}, options = {}) {
+  const shouldRateLimit = options.rateLimit !== false;
+  const limited = shouldRateLimit
+    ? applyIkRateLimit(candidate, currentState)
+    : { state: clampState(candidate), delta: ikDeltaDeg(clampState(candidate), clampState(currentState)), rateLimitScale: 1, rateLimited: false };
   const pose = computePose(limited.state);
   const finalScore = score(limited.state);
   const metrics = ikStepMetrics(limited.state, currentState, previousDelta);
@@ -662,6 +712,254 @@ function finalizeIkSolution(candidate, currentState, target, score, ikMode, best
     actuatorViolation: actuatorStrokeViolationForPose(pose),
     reachable: bestScore < 35 && finalScore < 35,
   };
+}
+
+function verticalToolOffsetForState(state) {
+  return clamp(state.arm1 - state.arm2 - state.arm3 + 90, LIMITS.offset.min, LIMITS.offset.max);
+}
+
+function withVerticalTool(state) {
+  const clamped = clampState(state);
+  return clampState({ ...clamped, offset: verticalToolOffsetForState(clamped) });
+}
+
+function planarTipRelativeForState(state) {
+  const tip = computePose(withVerticalTool(state)).toolCenter;
+  return { x: tip.x - JOINTS.baseArm1.x, z: tip.z - JOINTS.baseArm1.z };
+}
+
+function planarTargetForBase(targetWorld, base, displayOffset = {}) {
+  const localDisplayTarget = rotateXYAround(targetWorld, base);
+  return {
+    x: localDisplayTarget.x - (displayOffset.x || 0) - JOINTS.baseArm1.x,
+    z: localDisplayTarget.z - (displayOffset.z || 0) - JOINTS.baseArm1.z,
+    lateralError: Math.abs((localDisplayTarget.y || 0) - (displayOffset.y || 0)),
+  };
+}
+
+function candidateBaseAngles(currentBase, targetWorld, displayOffset = {}) {
+  const candidates = new Set();
+  const add = (value) => candidates.add(Number(wrapDegrees(value).toFixed(6)));
+  for (let step = -24; step <= 24; step += 4) add(currentBase + step);
+  for (let base = -180; base <= 180; base += 6) {
+    const target = planarTargetForBase(targetWorld, base, displayOffset);
+    if (target.lateralError < 120) {
+      add(base);
+      add(base - 2);
+      add(base + 2);
+    }
+  }
+  add(currentBase);
+  return Array.from(candidates);
+}
+
+function planarTipDistance(state, planarTarget) {
+  const tip = planarTipRelativeForState(state);
+  return Math.hypot(tip.x - planarTarget.x, tip.z - planarTarget.z);
+}
+
+function jointBrakingPenalty(state, delta, ddqLimitDeg = {}) {
+  let penalty = 0;
+  for (const key of ["base", "arm1", "arm2", "arm3", "offset"]) {
+    const velocity = delta[key] || 0;
+    const accel = Math.max(ddqLimitDeg[key] || 0, 1e-9);
+    if (velocity < 0) {
+      const distanceToLimit = state[key] - LIMITS[key].min;
+      penalty += Math.max(0, (velocity * velocity) / (2 * accel) - distanceToLimit);
+    } else if (velocity > 0) {
+      const distanceToLimit = LIMITS[key].max - state[key];
+      penalty += Math.max(0, (velocity * velocity) / (2 * accel) - distanceToLimit);
+    }
+  }
+  return penalty;
+}
+
+function generatePhiScanCandidates(planarTarget, currentState, base) {
+  const l1 = ARM_LENGTHS_MM.arm1;
+  const l2 = ARM_LENGTHS_MM.arm2;
+  const l3 = ARM_LENGTHS_MM.arm3;
+  const p3 = { x: planarTarget.x, z: planarTarget.z + TOOL_LENGTH_MM };
+  const candidates = [];
+  for (let phiDeg = PHI_SCAN_IK_PARAMS.phiMinDeg; phiDeg <= PHI_SCAN_IK_PARAMS.phiMaxDeg + 0.0001; phiDeg += PHI_SCAN_IK_PARAMS.phiStepDeg) {
+    const phi = degToRad(phiDeg);
+    const p2 = {
+      x: p3.x - l3 * Math.cos(phi),
+      z: p3.z - l3 * Math.sin(phi),
+    };
+    const d = (p2.x * p2.x + p2.z * p2.z - l1 * l1 - l2 * l2) / (2 * l1 * l2);
+    if (Math.abs(d) > 1) continue;
+    const root = Math.sqrt(Math.max(0, 1 - d * d));
+    for (const sign of [-1, 1]) {
+      const beta = Math.atan2(sign * root, d);
+      const absArm1 = Math.atan2(p2.z, p2.x) - Math.atan2(l2 * Math.sin(beta), l1 + l2 * Math.cos(beta));
+      const absArm2 = absArm1 + beta;
+      const absArm3 = phi;
+      const candidate = withVerticalTool({
+        ...currentState,
+        base,
+        arm1: absArm1 * 180 / Math.PI,
+        arm2: (absArm1 - absArm2) * 180 / Math.PI,
+        arm3: (absArm2 - absArm3) * 180 / Math.PI,
+      });
+      if (
+        candidate.arm1 < LIMITS.arm1.min ||
+        candidate.arm1 > LIMITS.arm1.max ||
+        candidate.arm2 < LIMITS.arm2.min ||
+        candidate.arm2 > LIMITS.arm2.max ||
+        candidate.arm3 < LIMITS.arm3.min ||
+        candidate.arm3 > LIMITS.arm3.max
+      ) {
+        continue;
+      }
+      candidates.push(candidate);
+    }
+  }
+  return candidates;
+}
+
+function solvePhiScanIk(targetWorld, currentState, displayOffset, score, previousDelta = {}) {
+  const current = clampState(currentState);
+  let bestCandidate = null;
+  let bestScore = Infinity;
+  const currentRelative = { arm1: current.arm1, arm2: -current.arm2, arm3: -current.arm3 };
+  for (const base of candidateBaseAngles(current.base, targetWorld, displayOffset)) {
+    const planarTarget = planarTargetForBase(targetWorld, base, displayOffset);
+    const candidates = generatePhiScanCandidates(planarTarget, current, base);
+    for (const rawCandidate of candidates) {
+      const relative = { arm1: rawCandidate.arm1, arm2: -rawCandidate.arm2, arm3: -rawCandidate.arm3 };
+      const rawTipError = planarTipDistance(rawCandidate, planarTarget);
+      const rateLimited = applyIkRateLimit(rawCandidate, current);
+      const accelerated = applyIkAccelerationLimit(rateLimited.state, current, previousDelta, PHI_SCAN_IK_PARAMS.ddqLimitDeg);
+      const limitedTipError = planarTipDistance(accelerated.state, planarTarget);
+      const limitedRelative = {
+        arm1: accelerated.state.arm1,
+        arm2: -accelerated.state.arm2,
+        arm3: -accelerated.state.arm3,
+      };
+      const gap = ikDeltaDeg(rawCandidate, accelerated.state);
+      const delta = ikDeltaDeg(accelerated.state, current);
+      const movement =
+        (relative.arm1 - currentRelative.arm1) ** 2 +
+        (relative.arm2 - currentRelative.arm2) ** 2 +
+        (relative.arm3 - currentRelative.arm3) ** 2;
+      const smoothness =
+        (delta.base - (previousDelta.base || 0)) ** 2 +
+        (delta.arm1 - (previousDelta.arm1 || 0)) ** 2 +
+        (delta.arm2 - (previousDelta.arm2 || 0)) ** 2 +
+        (delta.arm3 - (previousDelta.arm3 || 0)) ** 2 +
+        (delta.offset - (previousDelta.offset || 0)) ** 2;
+      const posture =
+        (limitedRelative.arm1 - PHI_SCAN_IK_PARAMS.qRefRelativeDeg.arm1) ** 2 +
+        (limitedRelative.arm2 - PHI_SCAN_IK_PARAMS.qRefRelativeDeg.arm2) ** 2 +
+        (limitedRelative.arm3 - PHI_SCAN_IK_PARAMS.qRefRelativeDeg.arm3) ** 2;
+      const unreachable = gap.arm1 ** 2 + gap.arm2 ** 2 + gap.arm3 ** 2;
+      const candidateScore =
+        limitedTipError +
+        planarTarget.lateralError +
+        0.2 * rawTipError +
+        PHI_SCAN_IK_PARAMS.wMove * movement +
+        PHI_SCAN_IK_PARAMS.wSmooth * smoothness +
+        PHI_SCAN_IK_PARAMS.wPosture * posture +
+        PHI_SCAN_IK_PARAMS.wUnreachable * unreachable +
+        PHI_SCAN_IK_PARAMS.wBrake * jointBrakingPenalty(accelerated.state, delta, PHI_SCAN_IK_PARAMS.ddqLimitDeg) +
+        actuatorStrokeViolationForState(accelerated.state) * 1000;
+      if (candidateScore < bestScore) {
+        bestScore = candidateScore;
+        bestCandidate = rawCandidate;
+      }
+    }
+  }
+  if (!bestCandidate) return null;
+  const rateLimited = applyIkRateLimit(bestCandidate, current);
+  return applyIkAccelerationLimit(rateLimited.state, current, previousDelta, PHI_SCAN_IK_PARAMS.ddqLimitDeg).state;
+}
+
+function solve3x3(matrix, vector) {
+  const m = matrix.map((row, index) => [...row, vector[index]]);
+  for (let column = 0; column < 3; column += 1) {
+    let pivot = column;
+    for (let row = column + 1; row < 3; row += 1) {
+      if (Math.abs(m[row][column]) > Math.abs(m[pivot][column])) pivot = row;
+    }
+    if (Math.abs(m[pivot][column]) < 1e-9) return [0, 0, 0];
+    if (pivot !== column) [m[pivot], m[column]] = [m[column], m[pivot]];
+    const divisor = m[column][column];
+    for (let col = column; col < 4; col += 1) m[column][col] /= divisor;
+    for (let row = 0; row < 3; row += 1) {
+      if (row === column) continue;
+      const factor = m[row][column];
+      for (let col = column; col < 4; col += 1) m[row][col] -= factor * m[column][col];
+    }
+  }
+  return [m[0][3], m[1][3], m[2][3]];
+}
+
+function clipVectorNorm(vector, maxNorm) {
+  const norm = Math.hypot(...vector);
+  if (norm > maxNorm && maxNorm > 0) return vector.map((value) => value * maxNorm / norm);
+  return vector;
+}
+
+function activeJacobian(state) {
+  const angles = absoluteAnglesForState(state);
+  const a1 = degToRad(angles.arm1);
+  const a2 = degToRad(angles.arm2);
+  const a3 = degToRad(angles.arm3);
+  const l1 = ARM_LENGTHS_MM.arm1;
+  const l2 = ARM_LENGTHS_MM.arm2;
+  const l3 = ARM_LENGTHS_MM.arm3;
+  return [
+    [-l1 * Math.sin(a1) - l2 * Math.sin(a2) - l3 * Math.sin(a3), l2 * Math.sin(a2) + l3 * Math.sin(a3), l3 * Math.sin(a3)],
+    [l1 * Math.cos(a1) + l2 * Math.cos(a2) + l3 * Math.cos(a3), -l2 * Math.cos(a2) - l3 * Math.cos(a3), -l3 * Math.cos(a3)],
+  ];
+}
+
+function solveActive3DlsIk(targetWorld, currentState, displayOffset, previousDelta = {}) {
+  const current = clampState(currentState);
+  const planarTarget = planarTargetForBase(targetWorld, current.base, displayOffset);
+  const currentTip = planarTipRelativeForState(current);
+  const error = [planarTarget.x - currentTip.x, planarTarget.z - currentTip.z];
+  const v = clipVectorNorm(error.map((value) => value * ACTIVE3_DLS_IK_PARAMS.Kp), ACTIVE3_DLS_IK_PARAMS.maxCartStepMm);
+  const jacobian = activeJacobian(current);
+  const weights = [ACTIVE3_DLS_IK_PARAMS.WDiag.arm1, ACTIVE3_DLS_IK_PARAMS.WDiag.arm2, ACTIVE3_DLS_IK_PARAMS.WDiag.arm3];
+  const qActive = [current.arm1, current.arm2, current.arm3].map(degToRad);
+  const qRef = [
+    ACTIVE3_DLS_IK_PARAMS.qRefActiveDeg.arm1,
+    ACTIVE3_DLS_IK_PARAMS.qRefActiveDeg.arm2,
+    ACTIVE3_DLS_IK_PARAMS.qRefActiveDeg.arm3,
+  ].map(degToRad);
+  const dqPrev = [previousDelta.arm1 || 0, previousDelta.arm2 || 0, previousDelta.arm3 || 0].map(degToRad);
+  const matrix = Array.from({ length: 3 }, () => [0, 0, 0]);
+  const rhs = [0, 0, 0];
+  for (let row = 0; row < 3; row += 1) {
+    for (let col = 0; col < 3; col += 1) {
+      matrix[row][col] = jacobian[0][row] * jacobian[0][col] + jacobian[1][row] * jacobian[1][col];
+    }
+    matrix[row][row] += ACTIVE3_DLS_IK_PARAMS.damping ** 2 * weights[row] ** 2 + ACTIVE3_DLS_IK_PARAMS.mu + ACTIVE3_DLS_IK_PARAMS.gamma;
+    rhs[row] =
+      jacobian[0][row] * v[0] +
+      jacobian[1][row] * v[1] +
+      ACTIVE3_DLS_IK_PARAMS.mu * dqPrev[row] +
+      ACTIVE3_DLS_IK_PARAMS.gamma * (qRef[row] - qActive[row]);
+  }
+  const dqRawDeg = solve3x3(matrix, rhs).map((value) => value * 180 / Math.PI);
+  const keys = ["arm1", "arm2", "arm3"];
+  const dq = {};
+  keys.forEach((key, index) => {
+    const velocityLimited = clamp(dqRawDeg[index], -ACTIVE3_DLS_IK_PARAMS.dqLimitDeg[key], ACTIVE3_DLS_IK_PARAMS.dqLimitDeg[key]);
+    dq[key] = clamp(
+      velocityLimited,
+      (previousDelta[key] || 0) - ACTIVE3_DLS_IK_PARAMS.ddqLimitDeg[key],
+      (previousDelta[key] || 0) + ACTIVE3_DLS_IK_PARAMS.ddqLimitDeg[key],
+    );
+  });
+  return clampState({
+    ...current,
+    arm1: current.arm1 + dq.arm1,
+    arm2: current.arm2 + dq.arm2,
+    arm3: current.arm3 + dq.arm3,
+    offset: current.offset,
+  });
 }
 
 function stateForActuatorStroke(key, normalizedStroke, currentState) {
@@ -736,7 +1034,9 @@ export function solveStateForToolTarget(targetWorld, currentState = DEFAULT_STAT
     if (step < 0.05) break;
   }
 
-  return finalizeIkSolution(candidate, currentState, target, score, ikMode, bestScore, previousDelta);
+  return finalizeIkSolution(candidate, currentState, target, score, ikMode, bestScore, previousDelta, {
+    rateLimit: ikMode !== IK_MODES.original.key,
+  });
 }
 
 export function solveStateForDisplayedToolTarget(targetWorld, currentState = DEFAULT_STATE, displayOffset = {}, options = {}) {
@@ -778,7 +1078,9 @@ export function solveStateForDisplayedToolTarget(targetWorld, currentState = DEF
     if (step < 0.05) break;
   }
 
-  return finalizeIkSolution(candidate, currentState, target, score, ikMode, bestScore, previousDelta);
+  return finalizeIkSolution(candidate, currentState, target, score, ikMode, bestScore, previousDelta, {
+    rateLimit: ikMode !== IK_MODES.original.key,
+  });
 }
 
 export function worldDisplayedToolPointForState(rawState, displayOffset = {}) {
@@ -806,6 +1108,22 @@ export function solveStateForWorldDisplayedToolTarget(targetWorld, currentState 
     return ikScoreFromDistance(distance, state, currentState, previousDelta, ikMode);
   };
 
+  if (ikMode === IK_MODES.phiScan.key) {
+    const phiCandidate = solvePhiScanIk(target, candidate, displayOffset, score, previousDelta);
+    if (phiCandidate) {
+      return finalizeIkSolution(phiCandidate, currentState, target, score, ikMode, score(phiCandidate), previousDelta, {
+        rateLimit: false,
+      });
+    }
+  }
+
+  if (ikMode === IK_MODES.active3Dls.key) {
+    const dlsCandidate = solveActive3DlsIk(target, candidate, displayOffset, previousDelta);
+    return finalizeIkSolution(dlsCandidate, currentState, target, score, ikMode, score(dlsCandidate), previousDelta, {
+      rateLimit: false,
+    });
+  }
+
   let bestScore = score(candidate);
   for (let iteration = 0; iteration < 240; iteration += 1) {
     let improved = false;
@@ -825,5 +1143,7 @@ export function solveStateForWorldDisplayedToolTarget(targetWorld, currentState 
     if (step < 0.05) break;
   }
 
-  return finalizeIkSolution(candidate, currentState, target, score, ikMode, bestScore, previousDelta);
+  return finalizeIkSolution(candidate, currentState, target, score, ikMode, bestScore, previousDelta, {
+    rateLimit: ikMode !== IK_MODES.original.key,
+  });
 }

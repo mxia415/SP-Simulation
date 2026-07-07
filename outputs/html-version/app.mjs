@@ -1447,6 +1447,8 @@ function createLinearControls() {
           <option value="original">Original</option>
           <option value="balanced">Balanced</option>
           <option value="improved">Improved</option>
+          <option value="phi_scan">Phi Scan</option>
+          <option value="active3_dls">Active-3 DLS</option>
         </select>
       </label>
       <label>路径长度 <output id="linearPathDistance">0 mm</output></label>
@@ -1512,7 +1514,9 @@ function createLinearControls() {
   });
   document.querySelector("#linearIkMode").addEventListener("change", (event) => {
     stopLinearSimulation();
-    linearMotion.ikMode = ["balanced", "improved"].includes(event.target.value) ? event.target.value : "original";
+    linearMotion.ikMode = ["balanced", "improved", "phi_scan", "active3_dls"].includes(event.target.value)
+      ? event.target.value
+      : "original";
     resetLinearIkHistory();
     runLinearMotion({ resetToStartState: importedLinearPathActive() });
   });

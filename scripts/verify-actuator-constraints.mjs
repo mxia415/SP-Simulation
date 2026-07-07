@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import {
+  ACTIVE3_DLS_IK_PARAMS,
   ACTUATOR_STROKE_LIMITS,
   BALANCED_IK_PARAMS,
   DEFAULT_STATE,
@@ -9,6 +10,7 @@ import {
   IMPROVED_IK_REFERENCE_DEG,
   IMPROVED_IK_PARAMS,
   LIMITS,
+  PHI_SCAN_IK_PARAMS,
   clampState,
   computePose,
   solveStateForWorldDisplayedToolTarget,
@@ -42,8 +44,10 @@ assert.deepEqual(
     original: { key: "original", label: "Original" },
     balanced: { key: "balanced", label: "Balanced" },
     improved: { key: "improved", label: "Improved" },
+    phiScan: { key: "phi_scan", label: "Phi Scan" },
+    active3Dls: { key: "active3_dls", label: "Active-3 DLS" },
   },
-  "HTML IK modes should expose Original, Balanced, and Improved without marking Improved as recommended",
+  "HTML IK modes should expose all five Python simulation algorithms",
 );
 assert.deepEqual(
   IK_DQ_LIMIT_DEG,
@@ -69,6 +73,37 @@ assert.deepEqual(
     referenceDeg: { base: 0, arm1: 90, arm2: 120, arm3: 60, offset: 0 },
   },
   "Improved IK should remain the strong posture-biased comparison strategy",
+);
+assert.deepEqual(
+  PHI_SCAN_IK_PARAMS,
+  {
+    phiMinDeg: -250,
+    phiMaxDeg: 250,
+    phiStepDeg: 1,
+    qRefRelativeDeg: { arm1: 90, arm2: -120, arm3: -60 },
+    wMove: 0.003,
+    wSmooth: 0.03,
+    wPosture: 0.001,
+    wUnreachable: 0.05,
+    ddqLimitDeg: { base: 1, arm1: 2, arm2: 2, arm3: 2, offset: 1 },
+    wBrake: 250,
+  },
+  "Phi Scan IK parameters should match the Python simulation",
+);
+assert.deepEqual(
+  ACTIVE3_DLS_IK_PARAMS,
+  {
+    Kp: 0.8,
+    maxCartStepMm: 50,
+    damping: 0.12,
+    WDiag: { arm1: 1.2, arm2: 1, arm3: 0.9 },
+    mu: 1.2,
+    gamma: 0.08,
+    qRefActiveDeg: { arm1: 90, arm2: 120, arm3: 60 },
+    dqLimitDeg: { arm1: 4, arm2: 4, arm3: 4 },
+    ddqLimitDeg: { arm1: 1.5, arm2: 1.5, arm3: 1.5 },
+  },
+  "Active-3 DLS IK parameters should match the Python simulation",
 );
 
 function actuatorLength(state, key) {
@@ -142,6 +177,34 @@ assert.ok(
   "IK metrics should include previous-delta deviation",
 );
 
+const phiScanIk = solveStateForWorldDisplayedToolTarget(ikTarget, DEFAULT_STATE, { x: 0, y: 262, z: 0 }, {
+  ikMode: "phi_scan",
+  previousDelta: balancedIk.delta,
+});
+assert.equal(phiScanIk.ikMode, "phi_scan", "Phi Scan IK mode should be reported");
+assert.ok(phiScanIk.delta && Number.isFinite(phiScanIk.delta.arm1), "Phi Scan IK should return a joint delta");
+for (const key of ["base", "arm1", "arm2", "arm3", "offset"]) {
+  assert.ok(
+    Math.abs(phiScanIk.delta[key]) <= IK_DQ_LIMIT_DEG[key] + 0.001,
+    `${key} Phi Scan output delta should respect shared rate limit`,
+  );
+}
+
+const active3DlsIk = solveStateForWorldDisplayedToolTarget(ikTarget, DEFAULT_STATE, { x: 0, y: 262, z: 0 }, {
+  ikMode: "active3_dls",
+  previousDelta: phiScanIk.delta,
+});
+assert.equal(active3DlsIk.ikMode, "active3_dls", "Active-3 DLS IK mode should be reported");
+assert.ok(active3DlsIk.delta && Number.isFinite(active3DlsIk.delta.arm3), "Active-3 DLS IK should return a joint delta");
+assert.ok(Math.abs(active3DlsIk.delta.base) <= 0.001, "Active-3 DLS should not move the base joint");
+assert.ok(Math.abs(active3DlsIk.delta.offset) <= 0.001, "Active-3 DLS should not directly drive printhead offset");
+for (const key of ["arm1", "arm2", "arm3"]) {
+  assert.ok(
+    Math.abs(active3DlsIk.delta[key] - (phiScanIk.delta[key] || 0)) <= ACTIVE3_DLS_IK_PARAMS.ddqLimitDeg[key] + 0.001,
+    `${key} Active-3 DLS output delta should respect active joint acceleration limit`,
+  );
+}
+
 const fallbackIk = solveStateForWorldDisplayedToolTarget(ikTarget, DEFAULT_STATE, { x: 0, y: 262, z: 0 }, {
   ikMode: "unknown-mode",
 });
@@ -152,7 +215,7 @@ const rateLimitedTarget = worldDisplayedToolPointForState(
   { x: 0, y: 262, z: 0 },
 );
 const rateLimitedIk = solveStateForWorldDisplayedToolTarget(rateLimitedTarget, DEFAULT_STATE, { x: 0, y: 262, z: 0 }, {
-  ikMode: "original",
+  ikMode: "balanced",
 });
 for (const key of ["base", "arm1", "arm2", "arm3", "offset"]) {
   assert.ok(
@@ -160,5 +223,16 @@ for (const key of ["base", "arm1", "arm2", "arm3", "offset"]) {
     `${key} IK output delta should be rate limited to ${IK_DQ_LIMIT_DEG[key]} deg, got ${rateLimitedIk.delta[key]}`,
   );
 }
+
+const unrestrictedOriginalIk = solveStateForWorldDisplayedToolTarget(
+  rateLimitedTarget,
+  DEFAULT_STATE,
+  { x: 0, y: 262, z: 0 },
+  { ikMode: "original" },
+);
+assert.ok(
+  ["base", "arm1", "arm2", "arm3", "offset"].some((key) => Math.abs(unrestrictedOriginalIk.delta[key]) > IK_DQ_LIMIT_DEG[key] + 0.001),
+  "Original IK should remain the un-rate-limited baseline",
+);
 
 console.log("Actuator constraint verification passed.");

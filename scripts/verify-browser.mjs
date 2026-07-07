@@ -110,8 +110,10 @@ try {
     { value: "original", label: "Original" },
     { value: "balanced", label: "Balanced" },
     { value: "improved", label: "Improved" },
+    { value: "phi_scan", label: "Phi Scan" },
+    { value: "active3_dls", label: "Active-3 DLS" },
   ])) {
-    throw new Error(`IK selector must expose Original, Balanced, Improved without recommendation labels: ${JSON.stringify(defaultResult, null, 2)}`);
+    throw new Error(`IK selector must expose all five Python simulation algorithms: ${JSON.stringify(defaultResult, null, 2)}`);
   }
   if (defaultResult.pathRender?.pointMarkers !== 0) {
     throw new Error(`Default imported cuboid path must not show point markers: ${JSON.stringify(defaultResult, null, 2)}`);
@@ -217,12 +219,12 @@ try {
     Math.abs(result.pose?.arm3 - 90) < 0.01 &&
     Math.abs(result.pose?.base) < 0.01;
   const solveError = Number.parseFloat(result.solveErrorText || "NaN");
-  const deltasWithinRateLimit = ["base", "arm1", "arm2", "arm3", "offset"].every((key) => {
+  const originalHasUnrestrictedDelta = ["base", "arm1", "arm2", "arm3", "offset"].some((key) => {
     const limit = { base: 2, arm1: 6, arm2: 6, arm3: 6, offset: 2 }[key];
-    return Math.abs(Number(result.linearMotion?.previousIkDelta?.[key] || 0)) <= limit + 0.001;
+    return Math.abs(Number(result.linearMotion?.previousIkDelta?.[key] || 0)) > limit + 0.001;
   });
-  if (poseStillVertical || !Number.isFinite(solveError) || !deltasWithinRateLimit) {
-    throw new Error(`Imported CSV progress must solve a non-vertical rate-limited pose: ${JSON.stringify(result, null, 2)}`);
+  if (poseStillVertical || !Number.isFinite(solveError) || !originalHasUnrestrictedDelta) {
+    throw new Error(`Imported CSV progress must solve a non-vertical unrestricted Original IK pose: ${JSON.stringify(result, null, 2)}`);
   }
   if (!result.coordinateSystem?.includes("3D视角 X/Y/Z") || !result.coordinateNote?.includes("Z为高度")) {
     throw new Error(`Coordinate note verification failed: ${JSON.stringify(result, null, 2)}`);
@@ -264,6 +266,42 @@ try {
   }
   if (!Number.isFinite(improvedResult.linearMotion?.previousIkDelta?.arm1)) {
     throw new Error(`Improved IK simulation must retain previous joint delta: ${JSON.stringify(improvedResult, null, 2)}`);
+  }
+
+  await page.selectOption("#linearIkMode", "phi_scan");
+  await page.fill("#linearProgressNumber", "50");
+  await page.dispatchEvent("#linearProgressNumber", "change");
+  const phiScanResult = await page.evaluate(() => ({
+    ikMode: document.querySelector("#linearIkMode")?.value,
+    linearMotion: window.__lingzhuDebug.linearMotion,
+    bootErrors: window.__lingzhuBootErrors,
+  }));
+  if (phiScanResult.bootErrors?.length) {
+    throw new Error(`Phi Scan IK switch produced boot errors: ${JSON.stringify(phiScanResult, null, 2)}`);
+  }
+  if (phiScanResult.ikMode !== "phi_scan" || phiScanResult.linearMotion?.ikMode !== "phi_scan") {
+    throw new Error(`Phi Scan IK mode must be selectable and reflected in debug state: ${JSON.stringify(phiScanResult, null, 2)}`);
+  }
+  if (!Number.isFinite(phiScanResult.linearMotion?.previousIkDelta?.arm1)) {
+    throw new Error(`Phi Scan IK simulation must retain previous joint delta: ${JSON.stringify(phiScanResult, null, 2)}`);
+  }
+
+  await page.selectOption("#linearIkMode", "active3_dls");
+  await page.fill("#linearProgressNumber", "50");
+  await page.dispatchEvent("#linearProgressNumber", "change");
+  const active3DlsResult = await page.evaluate(() => ({
+    ikMode: document.querySelector("#linearIkMode")?.value,
+    linearMotion: window.__lingzhuDebug.linearMotion,
+    bootErrors: window.__lingzhuBootErrors,
+  }));
+  if (active3DlsResult.bootErrors?.length) {
+    throw new Error(`Active-3 DLS IK switch produced boot errors: ${JSON.stringify(active3DlsResult, null, 2)}`);
+  }
+  if (active3DlsResult.ikMode !== "active3_dls" || active3DlsResult.linearMotion?.ikMode !== "active3_dls") {
+    throw new Error(`Active-3 DLS IK mode must be selectable and reflected in debug state: ${JSON.stringify(active3DlsResult, null, 2)}`);
+  }
+  if (!Number.isFinite(active3DlsResult.linearMotion?.previousIkDelta?.arm1)) {
+    throw new Error(`Active-3 DLS IK simulation must retain previous joint delta: ${JSON.stringify(active3DlsResult, null, 2)}`);
   }
 
   await page.click("#returnLinearStart");
