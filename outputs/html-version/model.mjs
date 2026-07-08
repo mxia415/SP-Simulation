@@ -1,5 +1,5 @@
 export const LIMITS = {
-  arm1: { min: 0, max: 128, label: "臂1" },
+  arm1: { min: 0, max: 95.3358, label: "臂1" },
   arm2: { min: 5, max: 180, label: "臂2" },
   arm3: { min: -10, max: 180, label: "臂3" },
   offset: { min: -60, max: 85, label: "打印头" },
@@ -35,7 +35,7 @@ export const IK_MODES = {
   balanced: { key: "balanced", label: "Balanced" },
   improved: { key: "improved", label: "Improved" },
   phiScan: { key: "phi_scan", label: "Phi Scan" },
-  active3Dls: { key: "active3_dls", label: "Active-3 DLS" },
+  active5Dls: { key: "active5_dls", label: "Active-5 3D DLS" },
 };
 
 export const IK_CONTINUITY_WEIGHTS = { base: 0.02, arm1: 0.08, arm2: 0.04, arm3: 0.04, offset: 0.02 };
@@ -56,7 +56,13 @@ export const IMPROVED_IK_PARAMS = {
 export const PHI_SCAN_IK_PARAMS = {
   phiMinDeg: -250,
   phiMaxDeg: 250,
-  phiStepDeg: 1,
+  phiStepDeg: 12,
+  phiLocalSpanDeg: 32,
+  phiLocalStepDeg: 2,
+  baseLocalSpanDeg: 8,
+  baseLocalStepDeg: 4,
+  baseAnalyticSpanDeg: 4,
+  baseAnalyticStepDeg: 2,
   qRefRelativeDeg: { arm1: 90, arm2: -120, arm3: -60 },
   wMove: 0.003,
   wSmooth: 0.03,
@@ -65,16 +71,19 @@ export const PHI_SCAN_IK_PARAMS = {
   ddqLimitDeg: { base: 1, arm1: 2, arm2: 2, arm3: 2, offset: 1 },
   wBrake: 250,
 };
-export const ACTIVE3_DLS_IK_PARAMS = {
+export const ACTIVE5_DLS_IK_PARAMS = {
   Kp: 0.8,
   maxCartStepMm: 50,
   damping: 0.12,
-  WDiag: { arm1: 1.2, arm2: 1, arm3: 0.9 },
+  WDiag: { base: 1.1, arm1: 1.2, arm2: 1, arm3: 0.9, offset: 0.8 },
   mu: 1.2,
   gamma: 0.08,
-  qRefActiveDeg: { arm1: 90, arm2: 120, arm3: 60 },
-  dqLimitDeg: { arm1: 4, arm2: 4, arm3: 4 },
-  ddqLimitDeg: { arm1: 1.5, arm2: 1.5, arm3: 1.5 },
+  toolAngleWeightMm: 500,
+  targetToolAngleDeg: -90,
+  maxOrientationStepDeg: 5,
+  qRefDeg: { ...IK_REFERENCE_DEG },
+  dqLimitDeg: { base: 2, arm1: 4, arm2: 4, arm3: 4, offset: 2 },
+  ddqLimitDeg: { base: 1, arm1: 1.5, arm2: 1.5, arm3: 1.5, offset: 1 },
 };
 export const IMPROVED_IK_REFERENCE_DEG = {
   arm1: IK_REFERENCE_DEG.arm1,
@@ -111,7 +120,7 @@ const ARM1_ACTUATOR_SIDE_OFFSET_MM = 291;
 const ARM2_ACTUATOR_SIDE_OFFSET_MM = 195.5;
 
 export const ACTUATOR_STROKE_LIMITS = {
-  arm1: { minLength: 1286.6, strokeLength: 900, label: "电缸1" },
+  arm1: { minLength: 1286.6, strokeLength: 800, label: "电缸1" },
   arm2: { minLength: 1177.9, strokeLength: 680, label: "电缸2" },
   arm3: { minLength: 1405.8, strokeLength: 520, label: "电缸3" },
 };
@@ -559,7 +568,7 @@ function normalizedIkMode(mode) {
   if (mode === IK_MODES.balanced.key) return IK_MODES.balanced.key;
   if (mode === IK_MODES.improved.key) return IK_MODES.improved.key;
   if (mode === IK_MODES.phiScan.key) return IK_MODES.phiScan.key;
-  if (mode === IK_MODES.active3Dls.key) return IK_MODES.active3Dls.key;
+  if (mode === IK_MODES.active5Dls.key || mode === "active3_dls") return IK_MODES.active5Dls.key;
   return IK_MODES.original.key;
 }
 
@@ -740,13 +749,28 @@ function planarTargetForBase(targetWorld, base, displayOffset = {}) {
 function candidateBaseAngles(currentBase, targetWorld, displayOffset = {}) {
   const candidates = new Set();
   const add = (value) => candidates.add(Number(wrapDegrees(value).toFixed(6)));
-  for (let step = -24; step <= 24; step += 4) add(currentBase + step);
-  for (let base = -180; base <= 180; base += 6) {
-    const target = planarTargetForBase(targetWorld, base, displayOffset);
-    if (target.lateralError < 120) {
-      add(base);
-      add(base - 2);
-      add(base + 2);
+  const localSpan = PHI_SCAN_IK_PARAMS.baseLocalSpanDeg;
+  const localStep = PHI_SCAN_IK_PARAMS.baseLocalStepDeg;
+  const analyticSpan = PHI_SCAN_IK_PARAMS.baseAnalyticSpanDeg;
+  const analyticStep = PHI_SCAN_IK_PARAMS.baseAnalyticStepDeg;
+  for (let step = -localSpan; step <= localSpan + 0.0001; step += localStep) add(currentBase + step);
+
+  const pivot = BASE_LINK_PIVOT_MM;
+  const x = targetWorld.x - pivot.x;
+  const y = (targetWorld.y || 0) - (pivot.y || 0);
+  const desiredY = (displayOffset.y || 0) - (pivot.y || 0);
+  const radius = Math.hypot(x, y);
+  if (radius > 0.001 && Math.abs(desiredY) <= radius) {
+    const alpha = Math.atan2(y, x);
+    const baseSolutions = [
+      Math.asin(desiredY / radius) - alpha,
+      Math.PI - Math.asin(desiredY / radius) - alpha,
+    ];
+    for (const solution of baseSolutions) {
+      const baseDeg = solution * 180 / Math.PI;
+      for (let step = -analyticSpan; step <= analyticSpan + 0.0001; step += analyticStep) {
+        add(baseDeg + step);
+      }
     }
   }
   add(currentBase);
@@ -780,7 +804,35 @@ function generatePhiScanCandidates(planarTarget, currentState, base) {
   const l3 = ARM_LENGTHS_MM.arm3;
   const p3 = { x: planarTarget.x, z: planarTarget.z + TOOL_LENGTH_MM };
   const candidates = [];
+  const phiCandidates = new Set();
+  const addPhi = (value) => {
+    const clamped = clamp(value, PHI_SCAN_IK_PARAMS.phiMinDeg, PHI_SCAN_IK_PARAMS.phiMaxDeg);
+    phiCandidates.add(Number(clamped.toFixed(6)));
+  };
+  const currentPhi = currentState.arm1 - currentState.arm2 - currentState.arm3;
+  const refPhi =
+    PHI_SCAN_IK_PARAMS.qRefRelativeDeg.arm1 +
+    PHI_SCAN_IK_PARAMS.qRefRelativeDeg.arm2 +
+    PHI_SCAN_IK_PARAMS.qRefRelativeDeg.arm3;
   for (let phiDeg = PHI_SCAN_IK_PARAMS.phiMinDeg; phiDeg <= PHI_SCAN_IK_PARAMS.phiMaxDeg + 0.0001; phiDeg += PHI_SCAN_IK_PARAMS.phiStepDeg) {
+    addPhi(phiDeg);
+  }
+  for (
+    let phiDeg = currentPhi - PHI_SCAN_IK_PARAMS.phiLocalSpanDeg;
+    phiDeg <= currentPhi + PHI_SCAN_IK_PARAMS.phiLocalSpanDeg + 0.0001;
+    phiDeg += PHI_SCAN_IK_PARAMS.phiLocalStepDeg
+  ) {
+    addPhi(phiDeg);
+  }
+  for (
+    let phiDeg = refPhi - PHI_SCAN_IK_PARAMS.phiLocalSpanDeg;
+    phiDeg <= refPhi + PHI_SCAN_IK_PARAMS.phiLocalSpanDeg + 0.0001;
+    phiDeg += PHI_SCAN_IK_PARAMS.phiLocalStepDeg
+  ) {
+    addPhi(phiDeg);
+  }
+
+  for (const phiDeg of phiCandidates) {
     const phi = degToRad(phiDeg);
     const p2 = {
       x: p3.x - l3 * Math.cos(phi),
@@ -874,24 +926,25 @@ function solvePhiScanIk(targetWorld, currentState, displayOffset, score, previou
   return applyIkAccelerationLimit(rateLimited.state, current, previousDelta, PHI_SCAN_IK_PARAMS.ddqLimitDeg).state;
 }
 
-function solve3x3(matrix, vector) {
+function solveLinearSystem(matrix, vector) {
   const m = matrix.map((row, index) => [...row, vector[index]]);
-  for (let column = 0; column < 3; column += 1) {
+  const size = vector.length;
+  for (let column = 0; column < size; column += 1) {
     let pivot = column;
-    for (let row = column + 1; row < 3; row += 1) {
+    for (let row = column + 1; row < size; row += 1) {
       if (Math.abs(m[row][column]) > Math.abs(m[pivot][column])) pivot = row;
     }
-    if (Math.abs(m[pivot][column]) < 1e-9) return [0, 0, 0];
+    if (Math.abs(m[pivot][column]) < 1e-9) return Array(size).fill(0);
     if (pivot !== column) [m[pivot], m[column]] = [m[column], m[pivot]];
     const divisor = m[column][column];
-    for (let col = column; col < 4; col += 1) m[column][col] /= divisor;
-    for (let row = 0; row < 3; row += 1) {
+    for (let col = column; col <= size; col += 1) m[column][col] /= divisor;
+    for (let row = 0; row < size; row += 1) {
       if (row === column) continue;
       const factor = m[row][column];
-      for (let col = column; col < 4; col += 1) m[row][col] -= factor * m[column][col];
+      for (let col = column; col <= size; col += 1) m[row][col] -= factor * m[column][col];
     }
   }
-  return [m[0][3], m[1][3], m[2][3]];
+  return m.map((row) => row[size]);
 }
 
 function clipVectorNorm(vector, maxNorm) {
@@ -914,51 +967,120 @@ function activeJacobian(state) {
   ];
 }
 
-function solveActive3DlsIk(targetWorld, currentState, displayOffset, previousDelta = {}) {
-  const current = clampState(currentState);
-  const planarTarget = planarTargetForBase(targetWorld, current.base, displayOffset);
-  const currentTip = planarTipRelativeForState(current);
-  const error = [planarTarget.x - currentTip.x, planarTarget.z - currentTip.z];
-  const v = clipVectorNorm(error.map((value) => value * ACTIVE3_DLS_IK_PARAMS.Kp), ACTIVE3_DLS_IK_PARAMS.maxCartStepMm);
-  const jacobian = activeJacobian(current);
-  const weights = [ACTIVE3_DLS_IK_PARAMS.WDiag.arm1, ACTIVE3_DLS_IK_PARAMS.WDiag.arm2, ACTIVE3_DLS_IK_PARAMS.WDiag.arm3];
-  const qActive = [current.arm1, current.arm2, current.arm3].map(degToRad);
-  const qRef = [
-    ACTIVE3_DLS_IK_PARAMS.qRefActiveDeg.arm1,
-    ACTIVE3_DLS_IK_PARAMS.qRefActiveDeg.arm2,
-    ACTIVE3_DLS_IK_PARAMS.qRefActiveDeg.arm3,
-  ].map(degToRad);
-  const dqPrev = [previousDelta.arm1 || 0, previousDelta.arm2 || 0, previousDelta.arm3 || 0].map(degToRad);
-  const matrix = Array.from({ length: 3 }, () => [0, 0, 0]);
-  const rhs = [0, 0, 0];
-  for (let row = 0; row < 3; row += 1) {
-    for (let col = 0; col < 3; col += 1) {
-      matrix[row][col] = jacobian[0][row] * jacobian[0][col] + jacobian[1][row] * jacobian[1][col];
-    }
-    matrix[row][row] += ACTIVE3_DLS_IK_PARAMS.damping ** 2 * weights[row] ** 2 + ACTIVE3_DLS_IK_PARAMS.mu + ACTIVE3_DLS_IK_PARAMS.gamma;
-    rhs[row] =
-      jacobian[0][row] * v[0] +
-      jacobian[1][row] * v[1] +
-      ACTIVE3_DLS_IK_PARAMS.mu * dqPrev[row] +
-      ACTIVE3_DLS_IK_PARAMS.gamma * (qRef[row] - qActive[row]);
+function active5LocalDisplayTip(state, displayOffset = {}) {
+  const pose = computePose(state);
+  return {
+    x: pose.axisTip.x + (displayOffset.x || 0),
+    y: pose.axisTip.y + (displayOffset.y || 0),
+    z: pose.axisTip.z - TOOL_LENGTH_MM + (displayOffset.z || 0),
+  };
+}
+
+function active5WorldDisplayTip(state, displayOffset = {}) {
+  return rotateXYAround(active5LocalDisplayTip(state, displayOffset), -state.base);
+}
+
+function active5ToolAngleDeg(state) {
+  return state.arm1 - state.arm2 - state.arm3 - state.offset;
+}
+
+function active5Jacobian(state, displayOffset = {}) {
+  const localTip = active5LocalDisplayTip(state, displayOffset);
+  const pivot = BASE_LINK_PIVOT_MM;
+  const base = degToRad(state.base);
+  const cosBase = Math.cos(base);
+  const sinBase = Math.sin(base);
+  const dx = localTip.x - pivot.x;
+  const dy = (localTip.y || 0) - (pivot.y || 0);
+  const planar = activeJacobian(state);
+  const toolWeight = ACTIVE5_DLS_IK_PARAMS.toolAngleWeightMm;
+  const rows = Array.from({ length: 4 }, () => Array(5).fill(0));
+
+  rows[0][0] = -dx * sinBase + dy * cosBase;
+  rows[1][0] = -dx * cosBase - dy * sinBase;
+  rows[2][0] = 0;
+
+  for (let index = 0; index < 3; index += 1) {
+    const dr = planar[0][index];
+    const dz = planar[1][index];
+    rows[0][index + 1] = dr * cosBase;
+    rows[1][index + 1] = -dr * sinBase;
+    rows[2][index + 1] = dz;
   }
-  const dqRawDeg = solve3x3(matrix, rhs).map((value) => value * 180 / Math.PI);
-  const keys = ["arm1", "arm2", "arm3"];
+
+  rows[3][0] = 0;
+  rows[3][1] = toolWeight;
+  rows[3][2] = -toolWeight;
+  rows[3][3] = -toolWeight;
+  rows[3][4] = -toolWeight;
+  return rows;
+}
+
+function solveActive5DlsIk(targetWorld, currentState, displayOffset, previousDelta = {}, options = {}) {
+  const current = clampState(currentState);
+  const stepScale = clamp(Number(options.stepScale ?? 1), 0.01, 1);
+  const currentTip = active5WorldDisplayTip(current, displayOffset);
+  const positionError = clipVectorNorm(
+    [
+      (targetWorld.x - currentTip.x) * ACTIVE5_DLS_IK_PARAMS.Kp,
+      (targetWorld.y - currentTip.y) * ACTIVE5_DLS_IK_PARAMS.Kp,
+      (targetWorld.z - currentTip.z) * ACTIVE5_DLS_IK_PARAMS.Kp,
+    ],
+    ACTIVE5_DLS_IK_PARAMS.maxCartStepMm,
+  );
+  const orientationStep = clamp(
+    ACTIVE5_DLS_IK_PARAMS.Kp * degToRad(angleDistance(ACTIVE5_DLS_IK_PARAMS.targetToolAngleDeg, active5ToolAngleDeg(current))),
+    -degToRad(ACTIVE5_DLS_IK_PARAMS.maxOrientationStepDeg),
+    degToRad(ACTIVE5_DLS_IK_PARAMS.maxOrientationStepDeg),
+  );
+  const toolError = ACTIVE5_DLS_IK_PARAMS.toolAngleWeightMm * orientationStep;
+  const error = [...positionError, toolError];
+  const trackingError = Math.hypot(...error);
+  const postureGamma = ACTIVE5_DLS_IK_PARAMS.gamma * clamp(trackingError / ACTIVE5_DLS_IK_PARAMS.maxCartStepMm, 0, 1);
+  const jacobian = active5Jacobian(current, displayOffset);
+  const keys = ["base", "arm1", "arm2", "arm3", "offset"];
+  const weights = keys.map((key) => ACTIVE5_DLS_IK_PARAMS.WDiag[key]);
+  const q = keys.map((key) => degToRad(current[key]));
+  const qRef = keys.map((key) => degToRad(ACTIVE5_DLS_IK_PARAMS.qRefDeg[key]));
+  const dqPrev = keys.map((key) => degToRad(previousDelta[key] || 0));
+  const matrix = Array.from({ length: keys.length }, () => Array(keys.length).fill(0));
+  const rhs = Array(keys.length).fill(0);
+  for (let row = 0; row < keys.length; row += 1) {
+    for (let col = 0; col < keys.length; col += 1) {
+      matrix[row][col] =
+        jacobian[0][row] * jacobian[0][col] +
+        jacobian[1][row] * jacobian[1][col] +
+        jacobian[2][row] * jacobian[2][col] +
+        jacobian[3][row] * jacobian[3][col];
+    }
+    matrix[row][row] += ACTIVE5_DLS_IK_PARAMS.damping ** 2 * weights[row] ** 2 + ACTIVE5_DLS_IK_PARAMS.mu + postureGamma;
+    rhs[row] =
+      jacobian[0][row] * error[0] +
+      jacobian[1][row] * error[1] +
+      jacobian[2][row] * error[2] +
+      jacobian[3][row] * error[3] +
+      ACTIVE5_DLS_IK_PARAMS.mu * dqPrev[row] +
+      postureGamma * (qRef[row] - q[row]);
+  }
+  const dqRawDeg = solveLinearSystem(matrix, rhs).map((value) => value * 180 / Math.PI);
   const dq = {};
   keys.forEach((key, index) => {
-    const velocityLimited = clamp(dqRawDeg[index], -ACTIVE3_DLS_IK_PARAMS.dqLimitDeg[key], ACTIVE3_DLS_IK_PARAMS.dqLimitDeg[key]);
+    const dqLimit = ACTIVE5_DLS_IK_PARAMS.dqLimitDeg[key] * stepScale;
+    const ddqLimit = ACTIVE5_DLS_IK_PARAMS.ddqLimitDeg[key] * stepScale;
+    const velocityLimited = clamp(dqRawDeg[index], -dqLimit, dqLimit);
     dq[key] = clamp(
       velocityLimited,
-      (previousDelta[key] || 0) - ACTIVE3_DLS_IK_PARAMS.ddqLimitDeg[key],
-      (previousDelta[key] || 0) + ACTIVE3_DLS_IK_PARAMS.ddqLimitDeg[key],
+      (previousDelta[key] || 0) - ddqLimit,
+      (previousDelta[key] || 0) + ddqLimit,
     );
   });
   return clampState({
     ...current,
+    base: wrapDegrees(current.base + dq.base),
     arm1: current.arm1 + dq.arm1,
     arm2: current.arm2 + dq.arm2,
     arm3: current.arm3 + dq.arm3,
-    offset: current.offset,
+    offset: current.offset + dq.offset,
   });
 }
 
@@ -1117,8 +1239,10 @@ export function solveStateForWorldDisplayedToolTarget(targetWorld, currentState 
     }
   }
 
-  if (ikMode === IK_MODES.active3Dls.key) {
-    const dlsCandidate = solveActive3DlsIk(target, candidate, displayOffset, previousDelta);
+  if (ikMode === IK_MODES.active5Dls.key) {
+    const dlsCandidate = solveActive5DlsIk(target, candidate, displayOffset, previousDelta, {
+      stepScale: options.stepScale,
+    });
     return finalizeIkSolution(dlsCandidate, currentState, target, score, ikMode, score(dlsCandidate), previousDelta, {
       rateLimit: false,
     });

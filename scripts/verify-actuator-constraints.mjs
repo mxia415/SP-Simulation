@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
+import { performance } from "node:perf_hooks";
 import {
-  ACTIVE3_DLS_IK_PARAMS,
+  ACTIVE5_DLS_IK_PARAMS,
   ACTUATOR_STROKE_LIMITS,
   BALANCED_IK_PARAMS,
   DEFAULT_STATE,
@@ -19,7 +20,7 @@ import {
 } from "../outputs/html-version/model.mjs";
 
 const EPS = 0.25;
-const EXPECTED_STROKE_LENGTHS = { arm1: 900, arm2: 680, arm3: 520 };
+const EXPECTED_STROKE_LENGTHS = { arm1: 800, arm2: 680, arm3: 520 };
 
 assert.deepEqual(
   { min: LIMITS.offset.min, max: LIMITS.offset.max },
@@ -28,6 +29,8 @@ assert.deepEqual(
 );
 assert.equal(clampState({ ...DEFAULT_STATE, offset: -120 }).offset, -60, "print head min clamp");
 assert.equal(clampState({ ...DEFAULT_STATE, offset: 120 }).offset, 85, "print head max clamp");
+assertNear(LIMITS.arm1.max, 95.3358, "arm1 max angle from 2086.6mm actuator limit", 0.01);
+assert.equal(clampState({ ...DEFAULT_STATE, arm1: 128 }).arm1, LIMITS.arm1.max, "arm1 clamp should use actuator-derived max angle");
 assert.deepEqual(
   IMPROVED_IK_REFERENCE_DEG,
   { arm1: 90, arm2: 120, arm3: 60, offset: 0 },
@@ -45,7 +48,7 @@ assert.deepEqual(
     balanced: { key: "balanced", label: "Balanced" },
     improved: { key: "improved", label: "Improved" },
     phiScan: { key: "phi_scan", label: "Phi Scan" },
-    active3Dls: { key: "active3_dls", label: "Active-3 DLS" },
+    active5Dls: { key: "active5_dls", label: "Active-5 3D DLS" },
   },
   "HTML IK modes should expose all five Python simulation algorithms",
 );
@@ -79,7 +82,13 @@ assert.deepEqual(
   {
     phiMinDeg: -250,
     phiMaxDeg: 250,
-    phiStepDeg: 1,
+    phiStepDeg: 12,
+    phiLocalSpanDeg: 32,
+    phiLocalStepDeg: 2,
+    baseLocalSpanDeg: 8,
+    baseLocalStepDeg: 4,
+    baseAnalyticSpanDeg: 4,
+    baseAnalyticStepDeg: 2,
     qRefRelativeDeg: { arm1: 90, arm2: -120, arm3: -60 },
     wMove: 0.003,
     wSmooth: 0.03,
@@ -91,19 +100,22 @@ assert.deepEqual(
   "Phi Scan IK parameters should match the Python simulation",
 );
 assert.deepEqual(
-  ACTIVE3_DLS_IK_PARAMS,
+  ACTIVE5_DLS_IK_PARAMS,
   {
     Kp: 0.8,
     maxCartStepMm: 50,
     damping: 0.12,
-    WDiag: { arm1: 1.2, arm2: 1, arm3: 0.9 },
+    WDiag: { base: 1.1, arm1: 1.2, arm2: 1, arm3: 0.9, offset: 0.8 },
     mu: 1.2,
     gamma: 0.08,
-    qRefActiveDeg: { arm1: 90, arm2: 120, arm3: 60 },
-    dqLimitDeg: { arm1: 4, arm2: 4, arm3: 4 },
-    ddqLimitDeg: { arm1: 1.5, arm2: 1.5, arm3: 1.5 },
+    toolAngleWeightMm: 500,
+    targetToolAngleDeg: -90,
+    maxOrientationStepDeg: 5,
+    qRefDeg: { base: 0, arm1: 90, arm2: 120, arm3: 60, offset: 0 },
+    dqLimitDeg: { base: 2, arm1: 4, arm2: 4, arm3: 4, offset: 2 },
+    ddqLimitDeg: { base: 1, arm1: 1.5, arm2: 1.5, arm3: 1.5, offset: 1 },
   },
-  "Active-3 DLS IK parameters should match the Python simulation",
+  "Active-5 3D DLS IK parameters should expose all five controlled joints",
 );
 
 function actuatorLength(state, key) {
@@ -177,12 +189,15 @@ assert.ok(
   "IK metrics should include previous-delta deviation",
 );
 
+const phiScanStartedAt = performance.now();
 const phiScanIk = solveStateForWorldDisplayedToolTarget(ikTarget, DEFAULT_STATE, { x: 0, y: 262, z: 0 }, {
   ikMode: "phi_scan",
   previousDelta: balancedIk.delta,
 });
+const phiScanElapsedMs = performance.now() - phiScanStartedAt;
 assert.equal(phiScanIk.ikMode, "phi_scan", "Phi Scan IK mode should be reported");
 assert.ok(phiScanIk.delta && Number.isFinite(phiScanIk.delta.arm1), "Phi Scan IK should return a joint delta");
+assert.ok(phiScanElapsedMs < 80, `Phi Scan IK should stay interactive, got ${phiScanElapsedMs.toFixed(1)}ms`);
 for (const key of ["base", "arm1", "arm2", "arm3", "offset"]) {
   assert.ok(
     Math.abs(phiScanIk.delta[key]) <= IK_DQ_LIMIT_DEG[key] + 0.001,
@@ -190,18 +205,47 @@ for (const key of ["base", "arm1", "arm2", "arm3", "offset"]) {
   );
 }
 
-const active3DlsIk = solveStateForWorldDisplayedToolTarget(ikTarget, DEFAULT_STATE, { x: 0, y: 262, z: 0 }, {
-  ikMode: "active3_dls",
-  previousDelta: phiScanIk.delta,
+function toolAngleErrorDeg(state) {
+  return Math.abs(-90 - (state.arm1 - state.arm2 - state.arm3 - state.offset));
+}
+
+const active5Target = worldDisplayedToolPointForState({ arm1: 76, arm2: 112, arm3: 82, offset: 0, base: 130 }, { x: 0, y: 262, z: 0 });
+const active5HoldTarget = worldDisplayedToolPointForState(DEFAULT_STATE, { x: 0, y: 262, z: 0 });
+const active5HoldIk = solveStateForWorldDisplayedToolTarget(active5HoldTarget, DEFAULT_STATE, { x: 0, y: 262, z: 0 }, {
+  ikMode: "active5_dls",
+  previousDelta: { base: 0, arm1: 0, arm2: 0, arm3: 0, offset: 0 },
 });
-assert.equal(active3DlsIk.ikMode, "active3_dls", "Active-3 DLS IK mode should be reported");
-assert.ok(active3DlsIk.delta && Number.isFinite(active3DlsIk.delta.arm3), "Active-3 DLS IK should return a joint delta");
-assert.ok(Math.abs(active3DlsIk.delta.base) <= 0.001, "Active-3 DLS should not move the base joint");
-assert.ok(Math.abs(active3DlsIk.delta.offset) <= 0.001, "Active-3 DLS should not directly drive printhead offset");
-for (const key of ["arm1", "arm2", "arm3"]) {
+for (const key of ["base", "arm1", "arm2", "arm3", "offset"]) {
   assert.ok(
-    Math.abs(active3DlsIk.delta[key] - (phiScanIk.delta[key] || 0)) <= ACTIVE3_DLS_IK_PARAMS.ddqLimitDeg[key] + 0.001,
-    `${key} Active-3 DLS output delta should respect active joint acceleration limit`,
+    Math.abs(active5HoldIk.delta[key]) < 0.001,
+    `${key} Active-5 3D DLS should not drift when the target already matches the current tool point`,
+  );
+}
+
+const active5DlsIk = solveStateForWorldDisplayedToolTarget(active5Target, DEFAULT_STATE, { x: 0, y: 262, z: 0 }, {
+  ikMode: "active5_dls",
+  previousDelta: { base: 0, arm1: 0, arm2: 0, arm3: 0, offset: 0 },
+});
+assert.equal(active5DlsIk.ikMode, "active5_dls", "Active-5 3D DLS IK mode should be reported");
+assert.ok(active5DlsIk.delta && Number.isFinite(active5DlsIk.delta.arm3), "Active-5 3D DLS IK should return a joint delta");
+assert.ok(Math.abs(active5DlsIk.delta.base) > 0.001, "Active-5 3D DLS should move the base for XY rotation");
+assert.ok(
+  ["arm1", "arm2", "arm3"].some((key) => Math.abs(active5DlsIk.delta[key]) > 0.001),
+  "Active-5 3D DLS should move arm joints for radius/height",
+);
+assert.ok(Math.abs(active5DlsIk.delta.offset) > 0.001, "Active-5 3D DLS should move printhead offset for vertical compensation");
+assert.ok(
+  toolAngleErrorDeg(active5DlsIk.state) < toolAngleErrorDeg({ ...DEFAULT_STATE, arm1: active5DlsIk.state.arm1, arm2: active5DlsIk.state.arm2, arm3: active5DlsIk.state.arm3, offset: DEFAULT_STATE.offset }),
+  "Active-5 3D DLS should reduce printhead vertical error versus moving arms without offset compensation",
+);
+for (const key of ["base", "arm1", "arm2", "arm3", "offset"]) {
+  assert.ok(
+    Math.abs(active5DlsIk.delta[key]) <= ACTIVE5_DLS_IK_PARAMS.dqLimitDeg[key] + 0.001,
+    `${key} Active-5 3D DLS output delta should respect joint velocity limit`,
+  );
+  assert.ok(
+    Math.abs(active5DlsIk.delta[key]) <= ACTIVE5_DLS_IK_PARAMS.ddqLimitDeg[key] + 0.001,
+    `${key} Active-5 3D DLS output delta should respect joint acceleration limit from rest`,
   );
 }
 

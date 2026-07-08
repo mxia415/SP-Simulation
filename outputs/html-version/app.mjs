@@ -30,10 +30,48 @@ import {
   sceneToDevicePointData,
 } from "./coordinates.mjs";
 
-const SCRIPT_VERSION = "20260706-glb-compress";
+const SCRIPT_VERSION = "20260707-python-active5-dls";
 const RENDER_SCALE = 1 / 1000;
 const QT_STAGE_MODE = new URLSearchParams(window.location.search).has("qtStage");
 if (QT_STAGE_MODE) document.documentElement.dataset.qtStage = "true";
+const THEME_STORAGE_KEY = "sps-control-theme";
+const THEMES = {
+  dark: {
+    key: "dark",
+    sceneBackground: 0x000000,
+    gridMajor: 0xb8b8b8,
+    gridMinor: 0x5f5f5f,
+    manualPath: 0xffffff,
+    walkedPath: 0xffffff,
+    remainingPath: 0xffffff,
+    importedPathPoint: 0x9ee8ff,
+  },
+  light: {
+    key: "light",
+    sceneBackground: 0xf6f6f3,
+    gridMajor: 0xc8c8c1,
+    gridMinor: 0xe5e5e0,
+    manualPath: 0x211922,
+    walkedPath: 0xe60023,
+    remainingPath: 0x262622,
+    importedPathPoint: 0xe60023,
+  },
+};
+
+function normalizedTheme(value) {
+  return value === THEMES.light.key ? THEMES.light.key : THEMES.dark.key;
+}
+
+function storedTheme() {
+  try {
+    return window.localStorage?.getItem(THEME_STORAGE_KEY);
+  } catch {
+    return null;
+  }
+}
+
+let currentTheme = normalizedTheme(storedTheme() || document.documentElement.dataset.theme);
+document.documentElement.dataset.theme = currentTheme;
 const DEFAULT_CAMERA_POSITION = new THREE.Vector3(9.5, 7.2, 11.6);
 const DEFAULT_CAMERA_TARGET = new THREE.Vector3(0.8, 2.2, 0);
 const BASE_LINK_PIVOT_MM = { x: 118.258, y: 0, z: 0 };
@@ -41,8 +79,138 @@ const TOOL_BALL_STICK_OFFSET_MM = { x: 0, y: 262, z: 0 };
 const IMPORTED_PATH_LINE_WIDTH_PX = 5;
 const IMPORTED_REMAINING_PATH_LINE_WIDTH_PX = 2;
 const IMPORTED_REMAINING_PATH_OPACITY = 0.05;
+const ACTIVE5_DLS_REFERENCE_STEP_SECONDS = 0.1;
+const ACTIVE5_MAX_TRACKING_ERROR_MM = 80;
+const ACTIVE5_FEED_SEARCH_ITERATIONS = 8;
 const DEFAULT_IMPORTED_PATH_URL = "assets/paths/cuboid-4000x2700x3300-layer200-y3600-viewXYZ.csv";
 const DEFAULT_IMPORTED_PATH_NAME = "cuboid-4000x2700x3300-layer200-y3600-viewXYZ.csv";
+const DEFAULT_IMPORTED_PATH_FALLBACK_CSV = `x,y,z
+3600,-2000,0
+4550,-1950,0
+6300,-1280,0
+6300,1280,0
+4550,1950,0
+3600,2000,0
+3600,-2000,0
+3600,-2000,200
+4607.96,-1948.16,200
+6300,-1300.3,200
+6300,1300.3,200
+4607.96,1948.16,200
+3600,2000,200
+3600,-2000,200
+3600,-2000,400
+4660.4,-1942.72,400
+6300,-1320.02,400
+6300,1320.02,400
+4660.4,1942.72,400
+3600,2000,400
+3600,-2000,400
+3600,-2000,600
+4702.31,-1933.99,600
+6300,-1338.58,600
+6300,1338.58,600
+4702.31,1933.99,600
+3600,2000,600
+3600,-2000,600
+3600,-2000,800
+4729.7,-1922.41,800
+6300,-1355.46,800
+6300,1355.46,800
+4729.7,1922.41,800
+3600,2000,800
+3600,-2000,800
+3600,-2000,1000
+4739.96,-1908.59,1000
+6300,-1370.15,1000
+6300,1370.15,1000
+4739.96,1908.59,1000
+3600,2000,1000
+3600,-2000,1000
+3600,-2000,1200
+4732.11,-1893.27,1200
+6300,-1382.25,1200
+6300,1382.25,1200
+4732.11,1893.27,1200
+3600,2000,1200
+3600,-2000,1200
+3600,-2000,1400
+4706.9,-1877.26,1400
+6300,-1391.4,1400
+6300,1391.4,1400
+4706.9,1877.26,1400
+3600,2000,1400
+3600,-2000,1400
+3600,-2000,1600
+4666.73,-1861.38,1600
+6300,-1397.34,1600
+6300,1397.34,1600
+4666.73,1861.38,1600
+3600,2000,1600
+3600,-2000,1600
+3600,-2000,1800
+4615.43,-1846.49,1800
+6300,-1399.9,1800
+6300,1399.9,1800
+4615.43,1846.49,1800
+3600,2000,1800
+3600,-2000,1800
+3600,-2000,2000
+4557.9,-1833.36,2000
+6300,-1399,2000
+6300,1399,2000
+4557.9,1833.36,2000
+3600,2000,2000
+3600,-2000,2000
+3600,-2000,2200
+4499.61,-1822.69,2200
+6300,-1394.67,2200
+6300,1394.67,2200
+4499.61,1822.69,2200
+3600,2000,2200
+3600,-2000,2200
+3600,-2000,2400
+4446.13,-1815.03,2400
+6300,-1387.03,2400
+6300,1387.03,2400
+4446.13,1815.03,2400
+3600,2000,2400
+3600,-2000,2400
+3600,-2000,2600
+4402.55,-1810.8,2600
+6300,-1376.31,2600
+6300,1376.31,2600
+4402.55,1810.8,2600
+3600,2000,2600
+3600,-2000,2600
+3600,-2000,2800
+4373.02,-1810.22,2800
+6300,-1362.81,2800
+6300,1362.81,2800
+4373.02,1810.22,2800
+3600,2000,2800
+3600,-2000,2800
+3600,-2000,3000
+4360.37,-1813.3,3000
+6300,-1346.92,3000
+6300,1346.92,3000
+4360.37,1813.3,3000
+3600,2000,3000
+3600,-2000,3000
+3600,-2000,3200
+4365.79,-1819.9,3200
+6300,-1329.11,3200
+6300,1329.11,3200
+4365.79,1819.9,3200
+3600,2000,3200
+3600,-2000,3200
+3600,-2000,3300
+4388.78,-1829.67,3300
+6300,-1309.87,3300
+6300,1309.87,3300
+4388.78,1829.67,3300
+3600,2000,3300
+3600,-2000,3300`;
 const SHOW_BALL_STICK_BASE = false;
 const SHOW_ARM1_ANCHOR_GUIDE = false;
 const ARM1_MODEL_REFERENCE_STATE = { visible: true, x: -3050, y: -135, z: -1590, rx: 0, ry: 0, rz: -90, scale: 1, unitScale: 1 };
@@ -232,14 +400,14 @@ try {
   };
 }
 renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
-renderer.setClearColor(0x000000, 1);
+renderer.setClearColor(THEMES[currentTheme].sceneBackground, 1);
 renderer.outputColorSpace = THREE.SRGBColorSpace;
 if (renderer.shadowMap) {
   renderer.shadowMap.enabled = false;
 }
 
 const scene = new THREE.Scene();
-scene.background = new THREE.Color(0x000000);
+scene.background = new THREE.Color(THEMES[currentTheme].sceneBackground);
 scene.fog = null;
 
 const camera = new THREE.PerspectiveCamera(42, 1, 0.08, 85);
@@ -276,9 +444,52 @@ deviceSceneRoot.add(pathRoot);
 const arm1AnchorGuideRoot = new THREE.Group();
 deviceSceneRoot.add(arm1AnchorGuideRoot);
 
-const grid = new THREE.GridHelper(11, 11, 0x444444, 0x1d1d1d);
+const grid = new THREE.GridHelper(11, 11, THEMES[currentTheme].gridMajor, THEMES[currentTheme].gridMinor);
 grid.position.y = -1.2;
 deviceSceneRoot.add(grid);
+
+function recolorGridHelper(gridHelper, theme) {
+  const colors = gridHelper.geometry?.attributes?.color;
+  if (!colors) return;
+  const centerIndex = Math.floor(11 / 2);
+  const major = new THREE.Color(theme.gridMajor);
+  const minor = new THREE.Color(theme.gridMinor);
+  let colorIndex = 0;
+  for (let lineIndex = 0; lineIndex <= 11; lineIndex += 1) {
+    const color = lineIndex === centerIndex ? major : minor;
+    for (let vertex = 0; vertex < 4; vertex += 1) {
+      colors.setXYZ(colorIndex, color.r, color.g, color.b);
+      colorIndex += 1;
+    }
+  }
+  colors.needsUpdate = true;
+}
+
+function applyTheme(nextTheme, { persist = true } = {}) {
+  currentTheme = normalizedTheme(nextTheme);
+  const theme = THEMES[currentTheme];
+  document.documentElement.dataset.theme = currentTheme;
+  if (persist) {
+    try {
+      window.localStorage?.setItem(THEME_STORAGE_KEY, currentTheme);
+    } catch {
+      // Theme persistence is optional; file:// or private-mode storage may be unavailable.
+    }
+  }
+  renderer.setClearColor(theme.sceneBackground, 1);
+  scene.background = new THREE.Color(theme.sceneBackground);
+  const gridMaterials = Array.isArray(grid.material) ? grid.material : [grid.material];
+  if (gridMaterials[0]?.color) gridMaterials[0].color.setHex(theme.gridMajor);
+  if (gridMaterials[1]?.color) gridMaterials[1].color.setHex(theme.gridMinor);
+  recolorGridHelper(grid, theme);
+  if (materials.path?.color) materials.path.color.setHex(theme.manualPath);
+  if (materials.walkedPath?.color) materials.walkedPath.color.setHex(theme.walkedPath);
+  if (materials.remainingPath?.color) materials.remainingPath.color.setHex(theme.remainingPath);
+  if (materials.importedPathPoint?.color) materials.importedPathPoint.color.setHex(theme.importedPathPoint);
+  document.querySelectorAll("[data-theme-choice]").forEach((button) => {
+    button.setAttribute("aria-pressed", String(button.dataset.themeChoice === currentTheme));
+  });
+}
 
 const staticGuideRoot = new THREE.Group();
 deviceSceneRoot.add(staticGuideRoot);
@@ -400,13 +611,15 @@ const linearMotion = {
   pathMode: "interpolated",
   pathSourceName: "",
   pathStatus: "未导入路径文件",
-  ikMode: "original",
+  ikMode: "active5_dls",
   previousIkDelta: { base: 0, arm1: 0, arm2: 0, arm3: 0, offset: 0 },
   progress: 0,
   speed: 500,
   animationFrame: null,
   isSimulating: false,
   startedAt: 0,
+  lastFrameAt: 0,
+  commandDistanceMm: 0,
 };
 const linearDrag = {
   active: false,
@@ -1168,8 +1381,13 @@ function verticalToolOffsetForState(candidate) {
   return clamp(candidate.arm1 - candidate.arm2 - candidate.arm3 + 90, LIMITS.offset.min, LIMITS.offset.max);
 }
 
+function active5LinearIkOwnsToolOffset() {
+  return driveMode === "linear" && linearMotion.ikMode === "active5_dls";
+}
+
 function applyToolVerticalConstraint() {
   if (!keepToolVertical) return;
+  if (active5LinearIkOwnsToolOffset()) return;
   state.offset = verticalToolOffsetForState(state);
 }
 
@@ -1448,7 +1666,7 @@ function createLinearControls() {
           <option value="balanced">Balanced</option>
           <option value="improved">Improved</option>
           <option value="phi_scan">Phi Scan</option>
-          <option value="active3_dls">Active-3 DLS</option>
+          <option value="active5_dls">Active-5 3D DLS</option>
         </select>
       </label>
       <label>路径长度 <output id="linearPathDistance">0 mm</output></label>
@@ -1514,7 +1732,7 @@ function createLinearControls() {
   });
   document.querySelector("#linearIkMode").addEventListener("change", (event) => {
     stopLinearSimulation();
-    linearMotion.ikMode = ["balanced", "improved", "phi_scan", "active3_dls"].includes(event.target.value)
+    linearMotion.ikMode = ["balanced", "improved", "phi_scan", "active5_dls"].includes(event.target.value)
       ? event.target.value
       : "original";
     resetLinearIkHistory();
@@ -1562,6 +1780,11 @@ function linearPathDistance() {
 
 function resetLinearIkHistory() {
   linearMotion.previousIkDelta = { base: 0, arm1: 0, arm2: 0, arm3: 0, offset: 0 };
+}
+
+function resetLinearPlaybackDistance() {
+  linearMotion.lastFrameAt = 0;
+  linearMotion.commandDistanceMm = linearPathDistance() * clamp(linearMotion.progress / 100, 0, 1);
 }
 
 function pathDistanceForPoints(points) {
@@ -1619,6 +1842,10 @@ function addPathLine(points, material, name, dashed = false) {
   if (dashed) line.computeLineDistances();
   pathRoot.add(line);
   return points.length - 1;
+}
+
+function materialColorHex(material) {
+  return material?.color ? `#${material.color.getHexString()}` : "";
 }
 
 function syncLinearPointInputs(kind) {
@@ -1737,6 +1964,7 @@ function applyImportedLinearPath(points, sourceName = "") {
   linearMotion.startState = verticalPoseState();
   resetLinearIkHistory();
   linearMotion.progress = 0;
+  resetLinearPlaybackDistance();
   syncLinearPointInputs("startWorld");
   syncLinearPointInputs("endWorld");
   runLinearMotion({ resetToStartState: true });
@@ -1764,15 +1992,19 @@ async function onLinearPathFileSelected(event) {
 }
 
 async function loadDefaultImportedLinearPath() {
+  setDriveMode("linear");
   try {
-    setDriveMode("linear");
     const response = await fetch(DEFAULT_IMPORTED_PATH_URL);
     if (!response.ok) throw new Error(`HTTP ${response.status}`);
     const text = await response.text();
     applyImportedLinearPath(parseCsvPathPoints(text), DEFAULT_IMPORTED_PATH_NAME);
   } catch (error) {
-    linearMotion.pathStatus = `默认路径导入失败：${error?.message || error}`;
-    syncLinearReadouts();
+    try {
+      applyImportedLinearPath(parseCsvPathPoints(DEFAULT_IMPORTED_PATH_FALLBACK_CSV), `${DEFAULT_IMPORTED_PATH_NAME} · 内置`);
+    } catch (fallbackError) {
+      linearMotion.pathStatus = `默认路径导入失败：${fallbackError?.message || fallbackError}`;
+      syncLinearReadouts();
+    }
   }
 }
 
@@ -1783,6 +2015,7 @@ function clearImportedLinearPath() {
   linearMotion.pathStatus = "未导入路径文件";
   resetLinearIkHistory();
   linearMotion.progress = 0;
+  resetLinearPlaybackDistance();
   syncLinearReadouts();
   runLinearMotion();
 }
@@ -1795,9 +2028,16 @@ function pointAtLinearProgress(points, progress) {
     const index = clamp(Math.round(t * (points.length - 1)), 0, points.length - 1);
     return roundedWorldPoint(points[index]);
   }
-  const total = linearPathDistance();
+  const total = pathDistanceForPoints(points);
+  return pointAtPathDistance(points, total * t);
+}
+
+function pointAtPathDistance(points, distanceMm) {
+  if (!points.length) return currentTipWorld();
+  if (points.length === 1) return roundedWorldPoint(points[0]);
+  const total = pathDistanceForPoints(points);
   if (total < 0.001) return roundedWorldPoint(points[0]);
-  let remaining = total * t;
+  let remaining = clamp(distanceMm, 0, total);
   for (let index = 1; index < points.length; index += 1) {
     const start = points[index - 1];
     const end = points[index];
@@ -1819,11 +2059,15 @@ function linearTargetFromProgress() {
   return pointAtLinearProgress(activeLinearPathPoints(), linearMotion.progress);
 }
 
+function linearTargetFromDistance(distanceMm) {
+  return pointAtPathDistance(activeLinearPathPoints(), distanceMm);
+}
+
 function displayedLinearTargetFromProgress() {
   return linearTargetFromProgress();
 }
 
-function runLinearMotion({ resetToStartState = false } = {}) {
+function runLinearMotion({ resetToStartState = false, targetDistanceMm = null, ikStepScale = 1 } = {}) {
   if (resetToStartState && linearMotion.startState) {
     Object.assign(state, clampState(linearMotion.startState));
     resetLinearIkHistory();
@@ -1834,19 +2078,66 @@ function runLinearMotion({ resetToStartState = false } = {}) {
     update(0);
     return;
   }
-  const solved = solveStateForWorldDisplayedToolTarget(linearTargetFromProgress(), state, TOOL_BALL_STICK_OFFSET_MM, {
+  const target = Number.isFinite(targetDistanceMm)
+    ? linearTargetFromDistance(targetDistanceMm)
+    : linearTargetFromProgress();
+  const solved = solveStateForWorldDisplayedToolTarget(target, state, TOOL_BALL_STICK_OFFSET_MM, {
     ikMode: linearMotion.ikMode,
     previousDelta: linearMotion.previousIkDelta,
+    stepScale: ikStepScale,
   });
+  commitLinearMotionSolution(solved);
+}
+
+function commitLinearMotionSolution(solved) {
   Object.assign(state, solved.state);
   linearMotion.previousIkDelta = solved.delta || linearMotion.previousIkDelta;
   applyToolVerticalConstraint();
   update(solved.error);
 }
 
+function solveLinearMotionAtDistance(distanceMm, ikStepScale, sourceState = state, previousDelta = linearMotion.previousIkDelta) {
+  return solveStateForWorldDisplayedToolTarget(linearTargetFromDistance(distanceMm), sourceState, TOOL_BALL_STICK_OFFSET_MM, {
+    ikMode: linearMotion.ikMode,
+    previousDelta,
+    stepScale: ikStepScale,
+  });
+}
+
+function chooseActive5FeedDistance(previousDistance, desiredDistance, ikStepScale) {
+  if (linearMotion.ikMode !== "active5_dls" || desiredDistance <= previousDistance) {
+    return { distance: desiredDistance, solved: solveLinearMotionAtDistance(desiredDistance, ikStepScale) };
+  }
+
+  const desiredSolved = solveLinearMotionAtDistance(desiredDistance, ikStepScale);
+  if (desiredSolved.error <= ACTIVE5_MAX_TRACKING_ERROR_MM) {
+    return { distance: desiredDistance, solved: desiredSolved };
+  }
+
+  let low = previousDistance;
+  let high = desiredDistance;
+  let bestDistance = previousDistance;
+  let bestSolved = null;
+  for (let index = 0; index < ACTIVE5_FEED_SEARCH_ITERATIONS; index += 1) {
+    const mid = (low + high) / 2;
+    const solved = solveLinearMotionAtDistance(mid, ikStepScale);
+    if (solved.error <= ACTIVE5_MAX_TRACKING_ERROR_MM) {
+      bestDistance = mid;
+      bestSolved = solved;
+      low = mid;
+    } else {
+      high = mid;
+    }
+  }
+
+  if (bestSolved) return { distance: bestDistance, solved: bestSolved };
+  return { distance: previousDistance, solved: solveLinearMotionAtDistance(previousDistance, ikStepScale) };
+}
+
 function setLinearProgress(value) {
   stopLinearSimulation();
   linearMotion.progress = clamp(Number(value), 0, 100);
+  resetLinearPlaybackDistance();
   resetLinearIkHistory();
   runLinearMotion({ resetToStartState: importedLinearPathActive() });
 }
@@ -1855,6 +2146,7 @@ function stopLinearSimulation() {
   if (linearMotion.animationFrame) cancelAnimationFrame(linearMotion.animationFrame);
   linearMotion.animationFrame = null;
   linearMotion.isSimulating = false;
+  linearMotion.lastFrameAt = 0;
   const button = document.querySelector("#simulateLinearMotion");
   if (button) button.textContent = "模拟";
 }
@@ -1862,6 +2154,7 @@ function stopLinearSimulation() {
 function returnLinearToStart() {
   stopLinearSimulation();
   linearMotion.progress = 0;
+  resetLinearPlaybackDistance();
   resetLinearIkHistory();
   if (linearMotion.startState) {
     Object.assign(state, clampState(linearMotion.startState));
@@ -1889,14 +2182,27 @@ function startLinearSimulation() {
   if (linearMotion.startState) Object.assign(state, clampState(linearMotion.startState));
   resetLinearIkHistory();
   linearMotion.progress = 0;
-  runLinearMotion();
-  linearMotion.startedAt = performance.now();
+  linearMotion.commandDistanceMm = 0;
+  linearMotion.lastFrameAt = 0;
+  linearMotion.startedAt = 0;
   linearMotion.isSimulating = true;
-  const durationMs = Math.max(1, (pathDistance / linearMotion.speed) * 1000);
+  runLinearMotion();
   const step = (now) => {
     if (!linearMotion.isSimulating) return;
-    linearMotion.progress = clamp(((now - linearMotion.startedAt) / durationMs) * 100, 0, 100);
-    runLinearMotion();
+    if (!linearMotion.lastFrameAt) {
+      linearMotion.lastFrameAt = now;
+      linearMotion.animationFrame = requestAnimationFrame(step);
+      return;
+    }
+    const deltaSeconds = Math.max(0, (now - linearMotion.lastFrameAt) / 1000);
+    linearMotion.lastFrameAt = now;
+    const frameDistance = linearMotion.speed * deltaSeconds;
+    const desiredDistance = Math.min(pathDistance, linearMotion.commandDistanceMm + frameDistance);
+    const ikStepScale = clamp(deltaSeconds / ACTIVE5_DLS_REFERENCE_STEP_SECONDS, 0.05, 1);
+    const feed = chooseActive5FeedDistance(linearMotion.commandDistanceMm, desiredDistance, ikStepScale);
+    linearMotion.commandDistanceMm = feed.distance;
+    linearMotion.progress = clamp((linearMotion.commandDistanceMm / pathDistance) * 100, 0, 100);
+    commitLinearMotionSolution(feed.solved);
     if (linearMotion.progress < 100) {
       linearMotion.animationFrame = requestAnimationFrame(step);
     } else {
@@ -1925,6 +2231,10 @@ function drawLinearPath() {
       remainingLineWidthPx: IMPORTED_REMAINING_PATH_LINE_WIDTH_PX,
       remainingOpacity: IMPORTED_REMAINING_PATH_OPACITY,
       remainingDashOffset,
+      colors: {
+        walkedPath: materialColorHex(materials.walkedPath),
+        remainingPath: materialColorHex(materials.remainingPath),
+      },
     };
   } else {
     pathRenderStats = {
@@ -1933,6 +2243,9 @@ function drawLinearPath() {
       mode: "manual",
       lineRenderer: "thin-line",
       lineWidthPx: 1,
+      colors: {
+        manualPath: materialColorHex(materials.path),
+      },
     };
   }
   if (importedLinearPathActive()) {
@@ -2609,6 +2922,7 @@ function update(linearError = 0) {
     coordinateSystem: COORDINATE_SYSTEM_NOTE,
     deviceSceneRotationY: DEVICE_SCENE_ROTATION_Y_RAD,
     webglAvailable,
+    theme: currentTheme,
     modelEffect,
     actuatorBallStickOnly,
     keepToolVertical,
@@ -2651,6 +2965,9 @@ function update(linearError = 0) {
       dragOffset: linearDrag.dragOffset.toArray(),
       targetWorld: linearMotion.startWorld && linearMotion.endWorld ? linearTargetFromProgress() : null,
       displayTargetWorld: linearMotion.startWorld && linearMotion.endWorld ? displayedLinearTargetFromProgress() : null,
+      simulationTargetWorld: linearMotion.startWorld && linearMotion.endWorld
+        ? linearTargetFromDistance(linearMotion.commandDistanceMm)
+        : null,
       toolDisplayWorld: currentTipWorld(),
       handleWorld: linearDrag.handleWorld,
       hasHandle: Boolean(tipDragHandle),
@@ -2798,6 +3115,9 @@ window.__spsQtStage = {
     const map = { "3D视角": "default", TOP: "top", XZ: "front", YZ: "side" };
     setViewMode(map[preset] || preset || "default");
   },
+  setTheme(nextTheme) {
+    applyTheme(nextTheme);
+  },
 };
 
 controlKeys.forEach(createControl);
@@ -2820,6 +3140,12 @@ document.querySelector("#resetButton").addEventListener("click", () => {
 document.querySelector("#angleModeButton").addEventListener("click", () => setDriveMode("angle"));
 document.querySelector("#strokeModeButton").addEventListener("click", () => setDriveMode("stroke"));
 document.querySelector("#linearModeButton").addEventListener("click", () => setDriveMode("linear"));
+document.querySelectorAll("[data-theme-choice]").forEach((button) => {
+  button.addEventListener("click", () => {
+    applyTheme(button.dataset.themeChoice);
+    update();
+  });
+});
 document.querySelector("#ballStickVisible").addEventListener("change", (event) => {
   ballStickRoot.visible = event.target.checked;
 });
@@ -2850,6 +3176,7 @@ function animate() {
 }
 
 resize();
+applyTheme(currentTheme, { persist: false });
 update();
 loadDefaultImportedLinearPath();
 animate();

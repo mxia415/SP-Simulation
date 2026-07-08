@@ -26332,7 +26332,7 @@ void main() {
 
   // outputs/html-version/model.mjs
   var LIMITS = {
-    arm1: { min: 0, max: 128, label: "\u81C21" },
+    arm1: { min: 0, max: 95.3358, label: "\u81C21" },
     arm2: { min: 5, max: 180, label: "\u81C22" },
     arm3: { min: -10, max: 180, label: "\u81C23" },
     offset: { min: -60, max: 85, label: "\u6253\u5370\u5934" },
@@ -26364,7 +26364,7 @@ void main() {
     balanced: { key: "balanced", label: "Balanced" },
     improved: { key: "improved", label: "Improved" },
     phiScan: { key: "phi_scan", label: "Phi Scan" },
-    active3Dls: { key: "active3_dls", label: "Active-3 DLS" }
+    active5Dls: { key: "active5_dls", label: "Active-5 3D DLS" }
   };
   var IK_CONTINUITY_WEIGHTS = { base: 0.02, arm1: 0.08, arm2: 0.04, arm3: 0.04, offset: 0.02 };
   var IK_DQ_LIMIT_DEG = { base: 2, arm1: 6, arm2: 6, arm3: 6, offset: 2 };
@@ -26384,7 +26384,13 @@ void main() {
   var PHI_SCAN_IK_PARAMS = {
     phiMinDeg: -250,
     phiMaxDeg: 250,
-    phiStepDeg: 1,
+    phiStepDeg: 12,
+    phiLocalSpanDeg: 32,
+    phiLocalStepDeg: 2,
+    baseLocalSpanDeg: 8,
+    baseLocalStepDeg: 4,
+    baseAnalyticSpanDeg: 4,
+    baseAnalyticStepDeg: 2,
     qRefRelativeDeg: { arm1: 90, arm2: -120, arm3: -60 },
     wMove: 3e-3,
     wSmooth: 0.03,
@@ -26393,16 +26399,19 @@ void main() {
     ddqLimitDeg: { base: 1, arm1: 2, arm2: 2, arm3: 2, offset: 1 },
     wBrake: 250
   };
-  var ACTIVE3_DLS_IK_PARAMS = {
+  var ACTIVE5_DLS_IK_PARAMS = {
     Kp: 0.8,
     maxCartStepMm: 50,
     damping: 0.12,
-    WDiag: { arm1: 1.2, arm2: 1, arm3: 0.9 },
+    WDiag: { base: 1.1, arm1: 1.2, arm2: 1, arm3: 0.9, offset: 0.8 },
     mu: 1.2,
     gamma: 0.08,
-    qRefActiveDeg: { arm1: 90, arm2: 120, arm3: 60 },
-    dqLimitDeg: { arm1: 4, arm2: 4, arm3: 4 },
-    ddqLimitDeg: { arm1: 1.5, arm2: 1.5, arm3: 1.5 }
+    toolAngleWeightMm: 500,
+    targetToolAngleDeg: -90,
+    maxOrientationStepDeg: 5,
+    qRefDeg: { ...IK_REFERENCE_DEG },
+    dqLimitDeg: { base: 2, arm1: 4, arm2: 4, arm3: 4, offset: 2 },
+    ddqLimitDeg: { base: 1, arm1: 1.5, arm2: 1.5, arm3: 1.5, offset: 1 }
   };
   var IMPROVED_IK_REFERENCE_DEG = {
     arm1: IK_REFERENCE_DEG.arm1,
@@ -26432,7 +26441,7 @@ void main() {
   var ARM1_ACTUATOR_SIDE_OFFSET_MM = 291;
   var ARM2_ACTUATOR_SIDE_OFFSET_MM = 195.5;
   var ACTUATOR_STROKE_LIMITS = {
-    arm1: { minLength: 1286.6, strokeLength: 900, label: "\u7535\u7F381" },
+    arm1: { minLength: 1286.6, strokeLength: 800, label: "\u7535\u7F381" },
     arm2: { minLength: 1177.9, strokeLength: 680, label: "\u7535\u7F382" },
     arm3: { minLength: 1405.8, strokeLength: 520, label: "\u7535\u7F383" }
   };
@@ -26833,7 +26842,7 @@ void main() {
     if (mode === IK_MODES.balanced.key) return IK_MODES.balanced.key;
     if (mode === IK_MODES.improved.key) return IK_MODES.improved.key;
     if (mode === IK_MODES.phiScan.key) return IK_MODES.phiScan.key;
-    if (mode === IK_MODES.active3Dls.key) return IK_MODES.active3Dls.key;
+    if (mode === IK_MODES.active5Dls.key || mode === "active3_dls") return IK_MODES.active5Dls.key;
     return IK_MODES.original.key;
   }
   function ikDeltaDeg(candidate, currentState) {
@@ -26977,13 +26986,27 @@ void main() {
   function candidateBaseAngles(currentBase, targetWorld, displayOffset = {}) {
     const candidates = /* @__PURE__ */ new Set();
     const add = (value) => candidates.add(Number(wrapDegrees(value).toFixed(6)));
-    for (let step = -24; step <= 24; step += 4) add(currentBase + step);
-    for (let base = -180; base <= 180; base += 6) {
-      const target = planarTargetForBase(targetWorld, base, displayOffset);
-      if (target.lateralError < 120) {
-        add(base);
-        add(base - 2);
-        add(base + 2);
+    const localSpan = PHI_SCAN_IK_PARAMS.baseLocalSpanDeg;
+    const localStep = PHI_SCAN_IK_PARAMS.baseLocalStepDeg;
+    const analyticSpan = PHI_SCAN_IK_PARAMS.baseAnalyticSpanDeg;
+    const analyticStep = PHI_SCAN_IK_PARAMS.baseAnalyticStepDeg;
+    for (let step = -localSpan; step <= localSpan + 1e-4; step += localStep) add(currentBase + step);
+    const pivot = BASE_LINK_PIVOT_MM;
+    const x = targetWorld.x - pivot.x;
+    const y = (targetWorld.y || 0) - (pivot.y || 0);
+    const desiredY = (displayOffset.y || 0) - (pivot.y || 0);
+    const radius = Math.hypot(x, y);
+    if (radius > 1e-3 && Math.abs(desiredY) <= radius) {
+      const alpha = Math.atan2(y, x);
+      const baseSolutions = [
+        Math.asin(desiredY / radius) - alpha,
+        Math.PI - Math.asin(desiredY / radius) - alpha
+      ];
+      for (const solution of baseSolutions) {
+        const baseDeg = solution * 180 / Math.PI;
+        for (let step = -analyticSpan; step <= analyticSpan + 1e-4; step += analyticStep) {
+          add(baseDeg + step);
+        }
       }
     }
     add(currentBase);
@@ -27014,7 +27037,23 @@ void main() {
     const l3 = ARM_LENGTHS_MM.arm3;
     const p3 = { x: planarTarget.x, z: planarTarget.z + TOOL_LENGTH_MM };
     const candidates = [];
+    const phiCandidates = /* @__PURE__ */ new Set();
+    const addPhi = (value) => {
+      const clamped = clamp2(value, PHI_SCAN_IK_PARAMS.phiMinDeg, PHI_SCAN_IK_PARAMS.phiMaxDeg);
+      phiCandidates.add(Number(clamped.toFixed(6)));
+    };
+    const currentPhi = currentState.arm1 - currentState.arm2 - currentState.arm3;
+    const refPhi = PHI_SCAN_IK_PARAMS.qRefRelativeDeg.arm1 + PHI_SCAN_IK_PARAMS.qRefRelativeDeg.arm2 + PHI_SCAN_IK_PARAMS.qRefRelativeDeg.arm3;
     for (let phiDeg = PHI_SCAN_IK_PARAMS.phiMinDeg; phiDeg <= PHI_SCAN_IK_PARAMS.phiMaxDeg + 1e-4; phiDeg += PHI_SCAN_IK_PARAMS.phiStepDeg) {
+      addPhi(phiDeg);
+    }
+    for (let phiDeg = currentPhi - PHI_SCAN_IK_PARAMS.phiLocalSpanDeg; phiDeg <= currentPhi + PHI_SCAN_IK_PARAMS.phiLocalSpanDeg + 1e-4; phiDeg += PHI_SCAN_IK_PARAMS.phiLocalStepDeg) {
+      addPhi(phiDeg);
+    }
+    for (let phiDeg = refPhi - PHI_SCAN_IK_PARAMS.phiLocalSpanDeg; phiDeg <= refPhi + PHI_SCAN_IK_PARAMS.phiLocalSpanDeg + 1e-4; phiDeg += PHI_SCAN_IK_PARAMS.phiLocalStepDeg) {
+      addPhi(phiDeg);
+    }
+    for (const phiDeg of phiCandidates) {
       const phi = degToRad2(phiDeg);
       const p2 = {
         x: p3.x - l3 * Math.cos(phi),
@@ -27079,24 +27118,25 @@ void main() {
     const rateLimited = applyIkRateLimit(bestCandidate, current);
     return applyIkAccelerationLimit(rateLimited.state, current, previousDelta, PHI_SCAN_IK_PARAMS.ddqLimitDeg).state;
   }
-  function solve3x3(matrix, vector) {
+  function solveLinearSystem(matrix, vector) {
     const m = matrix.map((row, index) => [...row, vector[index]]);
-    for (let column = 0; column < 3; column += 1) {
+    const size = vector.length;
+    for (let column = 0; column < size; column += 1) {
       let pivot = column;
-      for (let row = column + 1; row < 3; row += 1) {
+      for (let row = column + 1; row < size; row += 1) {
         if (Math.abs(m[row][column]) > Math.abs(m[pivot][column])) pivot = row;
       }
-      if (Math.abs(m[pivot][column]) < 1e-9) return [0, 0, 0];
+      if (Math.abs(m[pivot][column]) < 1e-9) return Array(size).fill(0);
       if (pivot !== column) [m[pivot], m[column]] = [m[column], m[pivot]];
       const divisor = m[column][column];
-      for (let col = column; col < 4; col += 1) m[column][col] /= divisor;
-      for (let row = 0; row < 3; row += 1) {
+      for (let col = column; col <= size; col += 1) m[column][col] /= divisor;
+      for (let row = 0; row < size; row += 1) {
         if (row === column) continue;
         const factor = m[row][column];
-        for (let col = column; col < 4; col += 1) m[row][col] -= factor * m[column][col];
+        for (let col = column; col <= size; col += 1) m[row][col] -= factor * m[column][col];
       }
     }
-    return [m[0][3], m[1][3], m[2][3]];
+    return m.map((row) => row[size]);
   }
   function clipVectorNorm(vector, maxNorm) {
     const norm = Math.hypot(...vector);
@@ -27116,47 +27156,103 @@ void main() {
       [l1 * Math.cos(a1) + l2 * Math.cos(a2) + l3 * Math.cos(a3), -l2 * Math.cos(a2) - l3 * Math.cos(a3), -l3 * Math.cos(a3)]
     ];
   }
-  function solveActive3DlsIk(targetWorld, currentState, displayOffset, previousDelta = {}) {
-    const current = clampState(currentState);
-    const planarTarget = planarTargetForBase(targetWorld, current.base, displayOffset);
-    const currentTip = planarTipRelativeForState(current);
-    const error = [planarTarget.x - currentTip.x, planarTarget.z - currentTip.z];
-    const v = clipVectorNorm(error.map((value) => value * ACTIVE3_DLS_IK_PARAMS.Kp), ACTIVE3_DLS_IK_PARAMS.maxCartStepMm);
-    const jacobian = activeJacobian(current);
-    const weights = [ACTIVE3_DLS_IK_PARAMS.WDiag.arm1, ACTIVE3_DLS_IK_PARAMS.WDiag.arm2, ACTIVE3_DLS_IK_PARAMS.WDiag.arm3];
-    const qActive = [current.arm1, current.arm2, current.arm3].map(degToRad2);
-    const qRef = [
-      ACTIVE3_DLS_IK_PARAMS.qRefActiveDeg.arm1,
-      ACTIVE3_DLS_IK_PARAMS.qRefActiveDeg.arm2,
-      ACTIVE3_DLS_IK_PARAMS.qRefActiveDeg.arm3
-    ].map(degToRad2);
-    const dqPrev = [previousDelta.arm1 || 0, previousDelta.arm2 || 0, previousDelta.arm3 || 0].map(degToRad2);
-    const matrix = Array.from({ length: 3 }, () => [0, 0, 0]);
-    const rhs = [0, 0, 0];
-    for (let row = 0; row < 3; row += 1) {
-      for (let col = 0; col < 3; col += 1) {
-        matrix[row][col] = jacobian[0][row] * jacobian[0][col] + jacobian[1][row] * jacobian[1][col];
-      }
-      matrix[row][row] += ACTIVE3_DLS_IK_PARAMS.damping ** 2 * weights[row] ** 2 + ACTIVE3_DLS_IK_PARAMS.mu + ACTIVE3_DLS_IK_PARAMS.gamma;
-      rhs[row] = jacobian[0][row] * v[0] + jacobian[1][row] * v[1] + ACTIVE3_DLS_IK_PARAMS.mu * dqPrev[row] + ACTIVE3_DLS_IK_PARAMS.gamma * (qRef[row] - qActive[row]);
+  function active5LocalDisplayTip(state2, displayOffset = {}) {
+    const pose = computePose(state2);
+    return {
+      x: pose.axisTip.x + (displayOffset.x || 0),
+      y: pose.axisTip.y + (displayOffset.y || 0),
+      z: pose.axisTip.z - TOOL_LENGTH_MM + (displayOffset.z || 0)
+    };
+  }
+  function active5WorldDisplayTip(state2, displayOffset = {}) {
+    return rotateXYAround(active5LocalDisplayTip(state2, displayOffset), -state2.base);
+  }
+  function active5ToolAngleDeg(state2) {
+    return state2.arm1 - state2.arm2 - state2.arm3 - state2.offset;
+  }
+  function active5Jacobian(state2, displayOffset = {}) {
+    const localTip = active5LocalDisplayTip(state2, displayOffset);
+    const pivot = BASE_LINK_PIVOT_MM;
+    const base = degToRad2(state2.base);
+    const cosBase = Math.cos(base);
+    const sinBase = Math.sin(base);
+    const dx = localTip.x - pivot.x;
+    const dy = (localTip.y || 0) - (pivot.y || 0);
+    const planar = activeJacobian(state2);
+    const toolWeight = ACTIVE5_DLS_IK_PARAMS.toolAngleWeightMm;
+    const rows = Array.from({ length: 4 }, () => Array(5).fill(0));
+    rows[0][0] = -dx * sinBase + dy * cosBase;
+    rows[1][0] = -dx * cosBase - dy * sinBase;
+    rows[2][0] = 0;
+    for (let index = 0; index < 3; index += 1) {
+      const dr = planar[0][index];
+      const dz = planar[1][index];
+      rows[0][index + 1] = dr * cosBase;
+      rows[1][index + 1] = -dr * sinBase;
+      rows[2][index + 1] = dz;
     }
-    const dqRawDeg = solve3x3(matrix, rhs).map((value) => value * 180 / Math.PI);
-    const keys = ["arm1", "arm2", "arm3"];
+    rows[3][0] = 0;
+    rows[3][1] = toolWeight;
+    rows[3][2] = -toolWeight;
+    rows[3][3] = -toolWeight;
+    rows[3][4] = -toolWeight;
+    return rows;
+  }
+  function solveActive5DlsIk(targetWorld, currentState, displayOffset, previousDelta = {}, options = {}) {
+    const current = clampState(currentState);
+    const stepScale = clamp2(Number(options.stepScale ?? 1), 0.01, 1);
+    const currentTip = active5WorldDisplayTip(current, displayOffset);
+    const positionError = clipVectorNorm(
+      [
+        (targetWorld.x - currentTip.x) * ACTIVE5_DLS_IK_PARAMS.Kp,
+        (targetWorld.y - currentTip.y) * ACTIVE5_DLS_IK_PARAMS.Kp,
+        (targetWorld.z - currentTip.z) * ACTIVE5_DLS_IK_PARAMS.Kp
+      ],
+      ACTIVE5_DLS_IK_PARAMS.maxCartStepMm
+    );
+    const orientationStep = clamp2(
+      ACTIVE5_DLS_IK_PARAMS.Kp * degToRad2(angleDistance(ACTIVE5_DLS_IK_PARAMS.targetToolAngleDeg, active5ToolAngleDeg(current))),
+      -degToRad2(ACTIVE5_DLS_IK_PARAMS.maxOrientationStepDeg),
+      degToRad2(ACTIVE5_DLS_IK_PARAMS.maxOrientationStepDeg)
+    );
+    const toolError = ACTIVE5_DLS_IK_PARAMS.toolAngleWeightMm * orientationStep;
+    const error = [...positionError, toolError];
+    const trackingError = Math.hypot(...error);
+    const postureGamma = ACTIVE5_DLS_IK_PARAMS.gamma * clamp2(trackingError / ACTIVE5_DLS_IK_PARAMS.maxCartStepMm, 0, 1);
+    const jacobian = active5Jacobian(current, displayOffset);
+    const keys = ["base", "arm1", "arm2", "arm3", "offset"];
+    const weights = keys.map((key) => ACTIVE5_DLS_IK_PARAMS.WDiag[key]);
+    const q = keys.map((key) => degToRad2(current[key]));
+    const qRef = keys.map((key) => degToRad2(ACTIVE5_DLS_IK_PARAMS.qRefDeg[key]));
+    const dqPrev = keys.map((key) => degToRad2(previousDelta[key] || 0));
+    const matrix = Array.from({ length: keys.length }, () => Array(keys.length).fill(0));
+    const rhs = Array(keys.length).fill(0);
+    for (let row = 0; row < keys.length; row += 1) {
+      for (let col = 0; col < keys.length; col += 1) {
+        matrix[row][col] = jacobian[0][row] * jacobian[0][col] + jacobian[1][row] * jacobian[1][col] + jacobian[2][row] * jacobian[2][col] + jacobian[3][row] * jacobian[3][col];
+      }
+      matrix[row][row] += ACTIVE5_DLS_IK_PARAMS.damping ** 2 * weights[row] ** 2 + ACTIVE5_DLS_IK_PARAMS.mu + postureGamma;
+      rhs[row] = jacobian[0][row] * error[0] + jacobian[1][row] * error[1] + jacobian[2][row] * error[2] + jacobian[3][row] * error[3] + ACTIVE5_DLS_IK_PARAMS.mu * dqPrev[row] + postureGamma * (qRef[row] - q[row]);
+    }
+    const dqRawDeg = solveLinearSystem(matrix, rhs).map((value) => value * 180 / Math.PI);
     const dq = {};
     keys.forEach((key, index) => {
-      const velocityLimited = clamp2(dqRawDeg[index], -ACTIVE3_DLS_IK_PARAMS.dqLimitDeg[key], ACTIVE3_DLS_IK_PARAMS.dqLimitDeg[key]);
+      const dqLimit = ACTIVE5_DLS_IK_PARAMS.dqLimitDeg[key] * stepScale;
+      const ddqLimit = ACTIVE5_DLS_IK_PARAMS.ddqLimitDeg[key] * stepScale;
+      const velocityLimited = clamp2(dqRawDeg[index], -dqLimit, dqLimit);
       dq[key] = clamp2(
         velocityLimited,
-        (previousDelta[key] || 0) - ACTIVE3_DLS_IK_PARAMS.ddqLimitDeg[key],
-        (previousDelta[key] || 0) + ACTIVE3_DLS_IK_PARAMS.ddqLimitDeg[key]
+        (previousDelta[key] || 0) - ddqLimit,
+        (previousDelta[key] || 0) + ddqLimit
       );
     });
     return clampState({
       ...current,
+      base: wrapDegrees(current.base + dq.base),
       arm1: current.arm1 + dq.arm1,
       arm2: current.arm2 + dq.arm2,
       arm3: current.arm3 + dq.arm3,
-      offset: current.offset
+      offset: current.offset + dq.offset
     });
   }
   function stateForActuatorStroke(key, normalizedStroke, currentState) {
@@ -27219,8 +27315,10 @@ void main() {
         });
       }
     }
-    if (ikMode === IK_MODES.active3Dls.key) {
-      const dlsCandidate = solveActive3DlsIk(target, candidate, displayOffset, previousDelta);
+    if (ikMode === IK_MODES.active5Dls.key) {
+      const dlsCandidate = solveActive5DlsIk(target, candidate, displayOffset, previousDelta, {
+        stepScale: options.stepScale
+      });
       return finalizeIkSolution(dlsCandidate, currentState, target, score, ikMode, score(dlsCandidate), previousDelta, {
         rateLimit: false
       });
@@ -27267,10 +27365,45 @@ void main() {
   }
 
   // outputs/html-version/app.mjs
-  var SCRIPT_VERSION = "20260706-glb-compress";
+  var SCRIPT_VERSION = "20260707-python-active5-dls";
   var RENDER_SCALE = 1 / 1e3;
   var QT_STAGE_MODE = new URLSearchParams(window.location.search).has("qtStage");
   if (QT_STAGE_MODE) document.documentElement.dataset.qtStage = "true";
+  var THEME_STORAGE_KEY = "sps-control-theme";
+  var THEMES = {
+    dark: {
+      key: "dark",
+      sceneBackground: 0,
+      gridMajor: 12105912,
+      gridMinor: 6250335,
+      manualPath: 16777215,
+      walkedPath: 16777215,
+      remainingPath: 16777215,
+      importedPathPoint: 10414335
+    },
+    light: {
+      key: "light",
+      sceneBackground: 16185075,
+      gridMajor: 13158593,
+      gridMinor: 15066592,
+      manualPath: 2169122,
+      walkedPath: 15073315,
+      remainingPath: 2500130,
+      importedPathPoint: 15073315
+    }
+  };
+  function normalizedTheme(value) {
+    return value === THEMES.light.key ? THEMES.light.key : THEMES.dark.key;
+  }
+  function storedTheme() {
+    try {
+      return window.localStorage?.getItem(THEME_STORAGE_KEY);
+    } catch {
+      return null;
+    }
+  }
+  var currentTheme = normalizedTheme(storedTheme() || document.documentElement.dataset.theme);
+  document.documentElement.dataset.theme = currentTheme;
   var DEFAULT_CAMERA_POSITION = new Vector3(9.5, 7.2, 11.6);
   var DEFAULT_CAMERA_TARGET = new Vector3(0.8, 2.2, 0);
   var BASE_LINK_PIVOT_MM2 = { x: 118.258, y: 0, z: 0 };
@@ -27278,8 +27411,138 @@ void main() {
   var IMPORTED_PATH_LINE_WIDTH_PX = 5;
   var IMPORTED_REMAINING_PATH_LINE_WIDTH_PX = 2;
   var IMPORTED_REMAINING_PATH_OPACITY = 0.05;
+  var ACTIVE5_DLS_REFERENCE_STEP_SECONDS = 0.1;
+  var ACTIVE5_MAX_TRACKING_ERROR_MM = 80;
+  var ACTIVE5_FEED_SEARCH_ITERATIONS = 8;
   var DEFAULT_IMPORTED_PATH_URL = "assets/paths/cuboid-4000x2700x3300-layer200-y3600-viewXYZ.csv";
   var DEFAULT_IMPORTED_PATH_NAME = "cuboid-4000x2700x3300-layer200-y3600-viewXYZ.csv";
+  var DEFAULT_IMPORTED_PATH_FALLBACK_CSV = `x,y,z
+3600,-2000,0
+4550,-1950,0
+6300,-1280,0
+6300,1280,0
+4550,1950,0
+3600,2000,0
+3600,-2000,0
+3600,-2000,200
+4607.96,-1948.16,200
+6300,-1300.3,200
+6300,1300.3,200
+4607.96,1948.16,200
+3600,2000,200
+3600,-2000,200
+3600,-2000,400
+4660.4,-1942.72,400
+6300,-1320.02,400
+6300,1320.02,400
+4660.4,1942.72,400
+3600,2000,400
+3600,-2000,400
+3600,-2000,600
+4702.31,-1933.99,600
+6300,-1338.58,600
+6300,1338.58,600
+4702.31,1933.99,600
+3600,2000,600
+3600,-2000,600
+3600,-2000,800
+4729.7,-1922.41,800
+6300,-1355.46,800
+6300,1355.46,800
+4729.7,1922.41,800
+3600,2000,800
+3600,-2000,800
+3600,-2000,1000
+4739.96,-1908.59,1000
+6300,-1370.15,1000
+6300,1370.15,1000
+4739.96,1908.59,1000
+3600,2000,1000
+3600,-2000,1000
+3600,-2000,1200
+4732.11,-1893.27,1200
+6300,-1382.25,1200
+6300,1382.25,1200
+4732.11,1893.27,1200
+3600,2000,1200
+3600,-2000,1200
+3600,-2000,1400
+4706.9,-1877.26,1400
+6300,-1391.4,1400
+6300,1391.4,1400
+4706.9,1877.26,1400
+3600,2000,1400
+3600,-2000,1400
+3600,-2000,1600
+4666.73,-1861.38,1600
+6300,-1397.34,1600
+6300,1397.34,1600
+4666.73,1861.38,1600
+3600,2000,1600
+3600,-2000,1600
+3600,-2000,1800
+4615.43,-1846.49,1800
+6300,-1399.9,1800
+6300,1399.9,1800
+4615.43,1846.49,1800
+3600,2000,1800
+3600,-2000,1800
+3600,-2000,2000
+4557.9,-1833.36,2000
+6300,-1399,2000
+6300,1399,2000
+4557.9,1833.36,2000
+3600,2000,2000
+3600,-2000,2000
+3600,-2000,2200
+4499.61,-1822.69,2200
+6300,-1394.67,2200
+6300,1394.67,2200
+4499.61,1822.69,2200
+3600,2000,2200
+3600,-2000,2200
+3600,-2000,2400
+4446.13,-1815.03,2400
+6300,-1387.03,2400
+6300,1387.03,2400
+4446.13,1815.03,2400
+3600,2000,2400
+3600,-2000,2400
+3600,-2000,2600
+4402.55,-1810.8,2600
+6300,-1376.31,2600
+6300,1376.31,2600
+4402.55,1810.8,2600
+3600,2000,2600
+3600,-2000,2600
+3600,-2000,2800
+4373.02,-1810.22,2800
+6300,-1362.81,2800
+6300,1362.81,2800
+4373.02,1810.22,2800
+3600,2000,2800
+3600,-2000,2800
+3600,-2000,3000
+4360.37,-1813.3,3000
+6300,-1346.92,3000
+6300,1346.92,3000
+4360.37,1813.3,3000
+3600,2000,3000
+3600,-2000,3000
+3600,-2000,3200
+4365.79,-1819.9,3200
+6300,-1329.11,3200
+6300,1329.11,3200
+4365.79,1819.9,3200
+3600,2000,3200
+3600,-2000,3200
+3600,-2000,3300
+4388.78,-1829.67,3300
+6300,-1309.87,3300
+6300,1309.87,3300
+4388.78,1829.67,3300
+3600,2000,3300
+3600,-2000,3300`;
   var SHOW_BALL_STICK_BASE = false;
   var SHOW_ARM1_ANCHOR_GUIDE = false;
   var ARM1_MODEL_REFERENCE_STATE = { visible: true, x: -3050, y: -135, z: -1590, rx: 0, ry: 0, rz: -90, scale: 1, unitScale: 1 };
@@ -27470,13 +27733,13 @@ void main() {
     };
   }
   renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
-  renderer.setClearColor(0, 1);
+  renderer.setClearColor(THEMES[currentTheme].sceneBackground, 1);
   renderer.outputColorSpace = SRGBColorSpace;
   if (renderer.shadowMap) {
     renderer.shadowMap.enabled = false;
   }
   var scene = new Scene();
-  scene.background = new Color(0);
+  scene.background = new Color(THEMES[currentTheme].sceneBackground);
   scene.fog = null;
   var camera = new PerspectiveCamera(42, 1, 0.08, 85);
   camera.position.copy(DEFAULT_CAMERA_POSITION);
@@ -27502,9 +27765,49 @@ void main() {
   deviceSceneRoot.add(pathRoot);
   var arm1AnchorGuideRoot = new Group();
   deviceSceneRoot.add(arm1AnchorGuideRoot);
-  var grid = new GridHelper(11, 11, 4473924, 1907997);
+  var grid = new GridHelper(11, 11, THEMES[currentTheme].gridMajor, THEMES[currentTheme].gridMinor);
   grid.position.y = -1.2;
   deviceSceneRoot.add(grid);
+  function recolorGridHelper(gridHelper, theme) {
+    const colors = gridHelper.geometry?.attributes?.color;
+    if (!colors) return;
+    const centerIndex = Math.floor(11 / 2);
+    const major = new Color(theme.gridMajor);
+    const minor = new Color(theme.gridMinor);
+    let colorIndex = 0;
+    for (let lineIndex = 0; lineIndex <= 11; lineIndex += 1) {
+      const color = lineIndex === centerIndex ? major : minor;
+      for (let vertex2 = 0; vertex2 < 4; vertex2 += 1) {
+        colors.setXYZ(colorIndex, color.r, color.g, color.b);
+        colorIndex += 1;
+      }
+    }
+    colors.needsUpdate = true;
+  }
+  function applyTheme(nextTheme, { persist = true } = {}) {
+    currentTheme = normalizedTheme(nextTheme);
+    const theme = THEMES[currentTheme];
+    document.documentElement.dataset.theme = currentTheme;
+    if (persist) {
+      try {
+        window.localStorage?.setItem(THEME_STORAGE_KEY, currentTheme);
+      } catch {
+      }
+    }
+    renderer.setClearColor(theme.sceneBackground, 1);
+    scene.background = new Color(theme.sceneBackground);
+    const gridMaterials = Array.isArray(grid.material) ? grid.material : [grid.material];
+    if (gridMaterials[0]?.color) gridMaterials[0].color.setHex(theme.gridMajor);
+    if (gridMaterials[1]?.color) gridMaterials[1].color.setHex(theme.gridMinor);
+    recolorGridHelper(grid, theme);
+    if (materials.path?.color) materials.path.color.setHex(theme.manualPath);
+    if (materials.walkedPath?.color) materials.walkedPath.color.setHex(theme.walkedPath);
+    if (materials.remainingPath?.color) materials.remainingPath.color.setHex(theme.remainingPath);
+    if (materials.importedPathPoint?.color) materials.importedPathPoint.color.setHex(theme.importedPathPoint);
+    document.querySelectorAll("[data-theme-choice]").forEach((button) => {
+      button.setAttribute("aria-pressed", String(button.dataset.themeChoice === currentTheme));
+    });
+  }
   var staticGuideRoot = new Group();
   deviceSceneRoot.add(staticGuideRoot);
   createWorldGuides();
@@ -27614,13 +27917,15 @@ void main() {
     pathMode: "interpolated",
     pathSourceName: "",
     pathStatus: "\u672A\u5BFC\u5165\u8DEF\u5F84\u6587\u4EF6",
-    ikMode: "original",
+    ikMode: "active5_dls",
     previousIkDelta: { base: 0, arm1: 0, arm2: 0, arm3: 0, offset: 0 },
     progress: 0,
     speed: 500,
     animationFrame: null,
     isSimulating: false,
-    startedAt: 0
+    startedAt: 0,
+    lastFrameAt: 0,
+    commandDistanceMm: 0
   };
   var linearDrag = {
     active: false,
@@ -28298,8 +28603,12 @@ void main() {
   function verticalToolOffsetForState2(candidate) {
     return clamp2(candidate.arm1 - candidate.arm2 - candidate.arm3 + 90, LIMITS.offset.min, LIMITS.offset.max);
   }
+  function active5LinearIkOwnsToolOffset() {
+    return driveMode === "linear" && linearMotion.ikMode === "active5_dls";
+  }
   function applyToolVerticalConstraint() {
     if (!keepToolVertical) return;
+    if (active5LinearIkOwnsToolOffset()) return;
     state.offset = verticalToolOffsetForState2(state);
   }
   function makeSphere(point, radius, material, parent = ballStickRoot) {
@@ -28562,7 +28871,7 @@ void main() {
           <option value="balanced">Balanced</option>
           <option value="improved">Improved</option>
           <option value="phi_scan">Phi Scan</option>
-          <option value="active3_dls">Active-3 DLS</option>
+          <option value="active5_dls">Active-5 3D DLS</option>
         </select>
       </label>
       <label>\u8DEF\u5F84\u957F\u5EA6 <output id="linearPathDistance">0 mm</output></label>
@@ -28627,7 +28936,7 @@ void main() {
     });
     document.querySelector("#linearIkMode").addEventListener("change", (event) => {
       stopLinearSimulation();
-      linearMotion.ikMode = ["balanced", "improved", "phi_scan", "active3_dls"].includes(event.target.value) ? event.target.value : "original";
+      linearMotion.ikMode = ["balanced", "improved", "phi_scan", "active5_dls"].includes(event.target.value) ? event.target.value : "original";
       resetLinearIkHistory();
       runLinearMotion({ resetToStartState: importedLinearPathActive() });
     });
@@ -28665,6 +28974,10 @@ void main() {
   }
   function resetLinearIkHistory() {
     linearMotion.previousIkDelta = { base: 0, arm1: 0, arm2: 0, arm3: 0, offset: 0 };
+  }
+  function resetLinearPlaybackDistance() {
+    linearMotion.lastFrameAt = 0;
+    linearMotion.commandDistanceMm = linearPathDistance() * clamp2(linearMotion.progress / 100, 0, 1);
   }
   function pathDistanceForPoints(points) {
     let total = 0;
@@ -28719,6 +29032,9 @@ void main() {
     if (dashed) line.computeLineDistances();
     pathRoot.add(line);
     return points.length - 1;
+  }
+  function materialColorHex(material) {
+    return material?.color ? `#${material.color.getHexString()}` : "";
   }
   function syncLinearPointInputs(kind) {
     const point = linearMotion[kind];
@@ -28821,6 +29137,7 @@ void main() {
     linearMotion.startState = verticalPoseState();
     resetLinearIkHistory();
     linearMotion.progress = 0;
+    resetLinearPlaybackDistance();
     syncLinearPointInputs("startWorld");
     syncLinearPointInputs("endWorld");
     runLinearMotion({ resetToStartState: true });
@@ -28845,15 +29162,19 @@ void main() {
     }
   }
   async function loadDefaultImportedLinearPath() {
+    setDriveMode("linear");
     try {
-      setDriveMode("linear");
       const response = await fetch(DEFAULT_IMPORTED_PATH_URL);
       if (!response.ok) throw new Error(`HTTP ${response.status}`);
       const text = await response.text();
       applyImportedLinearPath(parseCsvPathPoints(text), DEFAULT_IMPORTED_PATH_NAME);
     } catch (error) {
-      linearMotion.pathStatus = `\u9ED8\u8BA4\u8DEF\u5F84\u5BFC\u5165\u5931\u8D25\uFF1A${error?.message || error}`;
-      syncLinearReadouts();
+      try {
+        applyImportedLinearPath(parseCsvPathPoints(DEFAULT_IMPORTED_PATH_FALLBACK_CSV), `${DEFAULT_IMPORTED_PATH_NAME} \xB7 \u5185\u7F6E`);
+      } catch (fallbackError) {
+        linearMotion.pathStatus = `\u9ED8\u8BA4\u8DEF\u5F84\u5BFC\u5165\u5931\u8D25\uFF1A${fallbackError?.message || fallbackError}`;
+        syncLinearReadouts();
+      }
     }
   }
   function clearImportedLinearPath() {
@@ -28863,6 +29184,7 @@ void main() {
     linearMotion.pathStatus = "\u672A\u5BFC\u5165\u8DEF\u5F84\u6587\u4EF6";
     resetLinearIkHistory();
     linearMotion.progress = 0;
+    resetLinearPlaybackDistance();
     syncLinearReadouts();
     runLinearMotion();
   }
@@ -28874,9 +29196,15 @@ void main() {
       const index = clamp2(Math.round(t * (points.length - 1)), 0, points.length - 1);
       return roundedWorldPoint(points[index]);
     }
-    const total = linearPathDistance();
+    const total = pathDistanceForPoints(points);
+    return pointAtPathDistance(points, total * t);
+  }
+  function pointAtPathDistance(points, distanceMm) {
+    if (!points.length) return currentTipWorld();
+    if (points.length === 1) return roundedWorldPoint(points[0]);
+    const total = pathDistanceForPoints(points);
     if (total < 1e-3) return roundedWorldPoint(points[0]);
-    let remaining = total * t;
+    let remaining = clamp2(distanceMm, 0, total);
     for (let index = 1; index < points.length; index += 1) {
       const start = points[index - 1];
       const end = points[index];
@@ -28896,10 +29224,13 @@ void main() {
   function linearTargetFromProgress() {
     return pointAtLinearProgress(activeLinearPathPoints(), linearMotion.progress);
   }
+  function linearTargetFromDistance(distanceMm) {
+    return pointAtPathDistance(activeLinearPathPoints(), distanceMm);
+  }
   function displayedLinearTargetFromProgress() {
     return linearTargetFromProgress();
   }
-  function runLinearMotion({ resetToStartState = false } = {}) {
+  function runLinearMotion({ resetToStartState = false, targetDistanceMm = null, ikStepScale = 1 } = {}) {
     if (resetToStartState && linearMotion.startState) {
       Object.assign(state, clampState(linearMotion.startState));
       resetLinearIkHistory();
@@ -28910,18 +29241,57 @@ void main() {
       update(0);
       return;
     }
-    const solved = solveStateForWorldDisplayedToolTarget(linearTargetFromProgress(), state, TOOL_BALL_STICK_OFFSET_MM, {
+    const target = Number.isFinite(targetDistanceMm) ? linearTargetFromDistance(targetDistanceMm) : linearTargetFromProgress();
+    const solved = solveStateForWorldDisplayedToolTarget(target, state, TOOL_BALL_STICK_OFFSET_MM, {
       ikMode: linearMotion.ikMode,
-      previousDelta: linearMotion.previousIkDelta
+      previousDelta: linearMotion.previousIkDelta,
+      stepScale: ikStepScale
     });
+    commitLinearMotionSolution(solved);
+  }
+  function commitLinearMotionSolution(solved) {
     Object.assign(state, solved.state);
     linearMotion.previousIkDelta = solved.delta || linearMotion.previousIkDelta;
     applyToolVerticalConstraint();
     update(solved.error);
   }
+  function solveLinearMotionAtDistance(distanceMm, ikStepScale, sourceState = state, previousDelta = linearMotion.previousIkDelta) {
+    return solveStateForWorldDisplayedToolTarget(linearTargetFromDistance(distanceMm), sourceState, TOOL_BALL_STICK_OFFSET_MM, {
+      ikMode: linearMotion.ikMode,
+      previousDelta,
+      stepScale: ikStepScale
+    });
+  }
+  function chooseActive5FeedDistance(previousDistance, desiredDistance, ikStepScale) {
+    if (linearMotion.ikMode !== "active5_dls" || desiredDistance <= previousDistance) {
+      return { distance: desiredDistance, solved: solveLinearMotionAtDistance(desiredDistance, ikStepScale) };
+    }
+    const desiredSolved = solveLinearMotionAtDistance(desiredDistance, ikStepScale);
+    if (desiredSolved.error <= ACTIVE5_MAX_TRACKING_ERROR_MM) {
+      return { distance: desiredDistance, solved: desiredSolved };
+    }
+    let low = previousDistance;
+    let high = desiredDistance;
+    let bestDistance = previousDistance;
+    let bestSolved = null;
+    for (let index = 0; index < ACTIVE5_FEED_SEARCH_ITERATIONS; index += 1) {
+      const mid = (low + high) / 2;
+      const solved = solveLinearMotionAtDistance(mid, ikStepScale);
+      if (solved.error <= ACTIVE5_MAX_TRACKING_ERROR_MM) {
+        bestDistance = mid;
+        bestSolved = solved;
+        low = mid;
+      } else {
+        high = mid;
+      }
+    }
+    if (bestSolved) return { distance: bestDistance, solved: bestSolved };
+    return { distance: previousDistance, solved: solveLinearMotionAtDistance(previousDistance, ikStepScale) };
+  }
   function setLinearProgress(value) {
     stopLinearSimulation();
     linearMotion.progress = clamp2(Number(value), 0, 100);
+    resetLinearPlaybackDistance();
     resetLinearIkHistory();
     runLinearMotion({ resetToStartState: importedLinearPathActive() });
   }
@@ -28929,12 +29299,14 @@ void main() {
     if (linearMotion.animationFrame) cancelAnimationFrame(linearMotion.animationFrame);
     linearMotion.animationFrame = null;
     linearMotion.isSimulating = false;
+    linearMotion.lastFrameAt = 0;
     const button = document.querySelector("#simulateLinearMotion");
     if (button) button.textContent = "\u6A21\u62DF";
   }
   function returnLinearToStart() {
     stopLinearSimulation();
     linearMotion.progress = 0;
+    resetLinearPlaybackDistance();
     resetLinearIkHistory();
     if (linearMotion.startState) {
       Object.assign(state, clampState(linearMotion.startState));
@@ -28961,14 +29333,27 @@ void main() {
     if (linearMotion.startState) Object.assign(state, clampState(linearMotion.startState));
     resetLinearIkHistory();
     linearMotion.progress = 0;
-    runLinearMotion();
-    linearMotion.startedAt = performance.now();
+    linearMotion.commandDistanceMm = 0;
+    linearMotion.lastFrameAt = 0;
+    linearMotion.startedAt = 0;
     linearMotion.isSimulating = true;
-    const durationMs = Math.max(1, pathDistance / linearMotion.speed * 1e3);
+    runLinearMotion();
     const step = (now) => {
       if (!linearMotion.isSimulating) return;
-      linearMotion.progress = clamp2((now - linearMotion.startedAt) / durationMs * 100, 0, 100);
-      runLinearMotion();
+      if (!linearMotion.lastFrameAt) {
+        linearMotion.lastFrameAt = now;
+        linearMotion.animationFrame = requestAnimationFrame(step);
+        return;
+      }
+      const deltaSeconds = Math.max(0, (now - linearMotion.lastFrameAt) / 1e3);
+      linearMotion.lastFrameAt = now;
+      const frameDistance = linearMotion.speed * deltaSeconds;
+      const desiredDistance = Math.min(pathDistance, linearMotion.commandDistanceMm + frameDistance);
+      const ikStepScale = clamp2(deltaSeconds / ACTIVE5_DLS_REFERENCE_STEP_SECONDS, 0.05, 1);
+      const feed = chooseActive5FeedDistance(linearMotion.commandDistanceMm, desiredDistance, ikStepScale);
+      linearMotion.commandDistanceMm = feed.distance;
+      linearMotion.progress = clamp2(linearMotion.commandDistanceMm / pathDistance * 100, 0, 100);
+      commitLinearMotionSolution(feed.solved);
       if (linearMotion.progress < 100) {
         linearMotion.animationFrame = requestAnimationFrame(step);
       } else {
@@ -28995,7 +29380,11 @@ void main() {
         lineWidthPx: IMPORTED_PATH_LINE_WIDTH_PX,
         remainingLineWidthPx: IMPORTED_REMAINING_PATH_LINE_WIDTH_PX,
         remainingOpacity: IMPORTED_REMAINING_PATH_OPACITY,
-        remainingDashOffset
+        remainingDashOffset,
+        colors: {
+          walkedPath: materialColorHex(materials.walkedPath),
+          remainingPath: materialColorHex(materials.remainingPath)
+        }
       };
     } else {
       pathRenderStats = {
@@ -29003,7 +29392,10 @@ void main() {
         remainingSegments: 0,
         mode: "manual",
         lineRenderer: "thin-line",
-        lineWidthPx: 1
+        lineWidthPx: 1,
+        colors: {
+          manualPath: materialColorHex(materials.path)
+        }
       };
     }
     if (importedLinearPathActive()) {
@@ -29631,6 +30023,7 @@ void main() {
       coordinateSystem: COORDINATE_SYSTEM_NOTE,
       deviceSceneRotationY: DEVICE_SCENE_ROTATION_Y_RAD,
       webglAvailable,
+      theme: currentTheme,
       modelEffect,
       actuatorBallStickOnly,
       keepToolVertical,
@@ -29670,6 +30063,7 @@ void main() {
         dragOffset: linearDrag.dragOffset.toArray(),
         targetWorld: linearMotion.startWorld && linearMotion.endWorld ? linearTargetFromProgress() : null,
         displayTargetWorld: linearMotion.startWorld && linearMotion.endWorld ? displayedLinearTargetFromProgress() : null,
+        simulationTargetWorld: linearMotion.startWorld && linearMotion.endWorld ? linearTargetFromDistance(linearMotion.commandDistanceMm) : null,
         toolDisplayWorld: currentTipWorld(),
         handleWorld: linearDrag.handleWorld,
         hasHandle: Boolean(tipDragHandle)
@@ -29813,6 +30207,9 @@ void main() {
     setViewPreset(preset) {
       const map = { "3D\u89C6\u89D2": "default", TOP: "top", XZ: "front", YZ: "side" };
       setViewMode(map[preset] || preset || "default");
+    },
+    setTheme(nextTheme) {
+      applyTheme(nextTheme);
     }
   };
   controlKeys.forEach(createControl);
@@ -29834,6 +30231,12 @@ void main() {
   document.querySelector("#angleModeButton").addEventListener("click", () => setDriveMode("angle"));
   document.querySelector("#strokeModeButton").addEventListener("click", () => setDriveMode("stroke"));
   document.querySelector("#linearModeButton").addEventListener("click", () => setDriveMode("linear"));
+  document.querySelectorAll("[data-theme-choice]").forEach((button) => {
+    button.addEventListener("click", () => {
+      applyTheme(button.dataset.themeChoice);
+      update();
+    });
+  });
   document.querySelector("#ballStickVisible").addEventListener("change", (event) => {
     ballStickRoot.visible = event.target.checked;
   });
@@ -29861,6 +30264,7 @@ void main() {
     requestAnimationFrame(animate);
   }
   resize();
+  applyTheme(currentTheme, { persist: false });
   update();
   loadDefaultImportedLinearPath();
   animate();
