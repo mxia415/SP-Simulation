@@ -73,17 +73,17 @@ export const PHI_SCAN_IK_PARAMS = {
 };
 export const ACTIVE5_DLS_IK_PARAMS = {
   Kp: 0.8,
-  maxCartStepMm: 50,
-  damping: 0.12,
-  WDiag: { base: 1.1, arm1: 1.2, arm2: 1, arm3: 0.9, offset: 0.8 },
-  mu: 1.2,
-  gamma: 0.08,
+  maxCartStepMm: 80,
+  damping: 0.08,
+  WDiag: { base: 1.1, arm1: 1, arm2: 1, arm3: 1, offset: 0.8 },
+  mu: 0,
+  gamma: 0,
   toolAngleWeightMm: 500,
   targetToolAngleDeg: -90,
   maxOrientationStepDeg: 5,
-  qRefDeg: { ...IK_REFERENCE_DEG },
-  dqLimitDeg: { base: 2, arm1: 4, arm2: 4, arm3: 4, offset: 2 },
-  ddqLimitDeg: { base: 1, arm1: 1.5, arm2: 1.5, arm3: 1.5, offset: 1 },
+  qRefDeg: { base: IK_REFERENCE_DEG.base, arm1: 90, arm2: 90, arm3: 100, offset: IK_REFERENCE_DEG.offset },
+  dqLimitDeg: { base: 2, arm1: 6, arm2: 6, arm3: 6, offset: 2 },
+  ddqLimitDeg: { base: 1, arm1: 2, arm2: 2, arm3: 2, offset: 1 },
 };
 export const IMPROVED_IK_REFERENCE_DEG = {
   arm1: IK_REFERENCE_DEG.arm1,
