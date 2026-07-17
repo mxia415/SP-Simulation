@@ -74,6 +74,14 @@ function storedTheme() {
 
 let currentTheme = normalizedTheme(storedTheme() || document.documentElement.dataset.theme);
 document.documentElement.dataset.theme = currentTheme;
+const dracoLoader = new DRACOLoader();
+dracoLoader.setDecoderPath("assets/draco/gltf/");
+dracoLoader.setDecoderConfig({ type: "wasm" });
+dracoLoader.setWorkerLimit(4);
+dracoLoader.preload();
+const gltfLoader = new GLTFLoader();
+gltfLoader.setDRACOLoader(dracoLoader);
+gltfLoader.setMeshoptDecoder(MeshoptDecoder);
 const DEFAULT_CAMERA_POSITION = new THREE.Vector3(9.5, 7.2, 11.6);
 const DEFAULT_CAMERA_TARGET = new THREE.Vector3(0.8, 2.2, 0);
 const BASE_LINK_PIVOT_MM = { x: 118.258, y: 0, z: 0 };
@@ -2705,12 +2713,7 @@ async function loadModel(controller) {
       controller.stats.source = controller.glbPath;
     }
     controller.stats.bytes = buffer.byteLength;
-    const loader = new GLTFLoader();
-    const dracoLoader = new DRACOLoader();
-    dracoLoader.setDecoderPath("assets/draco/gltf/");
-    loader.setDRACOLoader(dracoLoader);
-    loader.setMeshoptDecoder(MeshoptDecoder);
-    const gltf = await new Promise((resolve, reject) => loader.parse(buffer, "", resolve, reject));
+    const gltf = await new Promise((resolve, reject) => gltfLoader.parse(buffer, "", resolve, reject));
     controller.model.add(gltf.scene);
     applyModelEffect(controller);
     controller.loaded = true;

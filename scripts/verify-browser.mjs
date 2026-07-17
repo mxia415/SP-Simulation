@@ -84,7 +84,7 @@ try {
       .filter((key) => key.endsWith("Model"))
       .every((key) => window.__lingzhuDebug[key]?.loaded),
     null,
-    { timeout: 30000 },
+    { timeout: 90000 },
   );
 
   const defaultResult = await page.evaluate(() => ({

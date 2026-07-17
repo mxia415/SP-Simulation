@@ -23265,8 +23265,8 @@ void main() {
         }
       }, onProgress, _onError);
     }
-    setDRACOLoader(dracoLoader) {
-      this.dracoLoader = dracoLoader;
+    setDRACOLoader(dracoLoader2) {
+      this.dracoLoader = dracoLoader2;
       return this;
     }
     setDDSLoader() {
@@ -24113,18 +24113,18 @@ void main() {
     }
   };
   var GLTFDracoMeshCompressionExtension = class {
-    constructor(json, dracoLoader) {
-      if (!dracoLoader) {
+    constructor(json, dracoLoader2) {
+      if (!dracoLoader2) {
         throw new Error("THREE.GLTFLoader: No DRACOLoader instance provided.");
       }
       this.name = EXTENSIONS.KHR_DRACO_MESH_COMPRESSION;
       this.json = json;
-      this.dracoLoader = dracoLoader;
+      this.dracoLoader = dracoLoader2;
       this.dracoLoader.preload();
     }
     decodePrimitive(primitive, parser) {
       const json = this.json;
-      const dracoLoader = this.dracoLoader;
+      const dracoLoader2 = this.dracoLoader;
       const bufferViewIndex = primitive.extensions[this.name].bufferView;
       const gltfAttributeMap = primitive.extensions[this.name].attributes;
       const threeAttributeMap = {};
@@ -24145,7 +24145,7 @@ void main() {
       }
       return parser.getDependency("bufferView", bufferViewIndex).then(function(bufferView) {
         return new Promise(function(resolve, reject) {
-          dracoLoader.decodeDracoFile(bufferView, function(geometry) {
+          dracoLoader2.decodeDracoFile(bufferView, function(geometry) {
             for (const attributeName in geometry.attributes) {
               const attribute = geometry.attributes[attributeName];
               const normalized = attributeNormalizedMap[attributeName];
@@ -27751,6 +27751,14 @@ void main() {
   }
   var currentTheme = normalizedTheme(storedTheme() || document.documentElement.dataset.theme);
   document.documentElement.dataset.theme = currentTheme;
+  var dracoLoader = new DRACOLoader();
+  dracoLoader.setDecoderPath("assets/draco/gltf/");
+  dracoLoader.setDecoderConfig({ type: "wasm" });
+  dracoLoader.setWorkerLimit(4);
+  dracoLoader.preload();
+  var gltfLoader = new GLTFLoader();
+  gltfLoader.setDRACOLoader(dracoLoader);
+  gltfLoader.setMeshoptDecoder(MeshoptDecoder);
   var DEFAULT_CAMERA_POSITION = new Vector3(9.5, 7.2, 11.6);
   var DEFAULT_CAMERA_TARGET = new Vector3(0.8, 2.2, 0);
   var BASE_LINK_PIVOT_MM2 = { x: 118.258, y: 0, z: 0 };
@@ -30157,12 +30165,7 @@ void main() {
         controller.stats.source = controller.glbPath;
       }
       controller.stats.bytes = buffer.byteLength;
-      const loader = new GLTFLoader();
-      const dracoLoader = new DRACOLoader();
-      dracoLoader.setDecoderPath("assets/draco/gltf/");
-      loader.setDRACOLoader(dracoLoader);
-      loader.setMeshoptDecoder(MeshoptDecoder);
-      const gltf = await new Promise((resolve, reject) => loader.parse(buffer, "", resolve, reject));
+      const gltf = await new Promise((resolve, reject) => gltfLoader.parse(buffer, "", resolve, reject));
       controller.model.add(gltf.scene);
       applyModelEffect(controller);
       controller.loaded = true;
