@@ -101,6 +101,20 @@ try {
       numberMin: document.querySelector("#offsetNumber")?.min,
       numberMax: document.querySelector("#offsetNumber")?.max,
     },
+    jointRanges: {
+      arm2: {
+        sliderMin: document.querySelector("#arm2")?.min,
+        sliderMax: document.querySelector("#arm2")?.max,
+        numberMin: document.querySelector("#arm2Number")?.min,
+        numberMax: document.querySelector("#arm2Number")?.max,
+      },
+      arm3: {
+        sliderMin: document.querySelector("#arm3")?.min,
+        sliderMax: document.querySelector("#arm3")?.max,
+        numberMin: document.querySelector("#arm3Number")?.min,
+        numberMax: document.querySelector("#arm3Number")?.max,
+      },
+    },
     presets: Array.from(document.querySelectorAll(".preset-button")).map((button) => ({
       label: button.querySelector("strong")?.textContent,
       values: button.querySelector("span")?.textContent,
@@ -143,6 +157,18 @@ try {
     defaultResult.toolRange?.numberMax !== "150"
   ) {
     throw new Error(`Print head controls must expose -55..150 degree range: ${JSON.stringify(defaultResult, null, 2)}`);
+  }
+  if (
+    defaultResult.jointRanges?.arm2?.sliderMin !== "16.0271" ||
+    defaultResult.jointRanges?.arm2?.sliderMax !== "177.9644" ||
+    defaultResult.jointRanges?.arm2?.numberMin !== "16.0271" ||
+    defaultResult.jointRanges?.arm2?.numberMax !== "177.9644" ||
+    defaultResult.jointRanges?.arm3?.sliderMin !== "10.4567" ||
+    defaultResult.jointRanges?.arm3?.sliderMax !== "180" ||
+    defaultResult.jointRanges?.arm3?.numberMin !== "10.4567" ||
+    defaultResult.jointRanges?.arm3?.numberMax !== "180"
+  ) {
+    throw new Error(`Arm2/arm3 controls must expose corrected angle ranges: ${JSON.stringify(defaultResult, null, 2)}`);
   }
   if (!defaultResult.presets?.some((preset) => preset.label === "初始打印姿态" && preset.values === "81 / 72 / 49 / 50 / 4")) {
     throw new Error(`Preset controls must expose the initial print pose: ${JSON.stringify(defaultResult, null, 2)}`);

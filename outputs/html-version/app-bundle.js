@@ -26333,8 +26333,8 @@ void main() {
   // outputs/html-version/model.mjs
   var LIMITS = {
     arm1: { min: 0, max: 83.8189, label: "\u81C21" },
-    arm2: { min: 16.039, max: 177.9769, label: "\u81C22" },
-    arm3: { min: 2.1446, max: 180, label: "\u81C23" },
+    arm2: { min: 16.0271, max: 177.9644, label: "\u81C22" },
+    arm3: { min: 10.4567, max: 180, label: "\u81C23" },
     offset: { min: -55, max: 150, label: "\u6253\u5370\u5934" },
     base: { min: -180, max: 180, label: "\u65CB\u8F6C" }
   };
@@ -26428,9 +26428,9 @@ void main() {
   var IMPROVED_IK_SMOOTHNESS_MU = IMPROVED_IK_PARAMS.smoothnessMu;
   var JOINTS = {
     baseArm1: { x: -450.742, y: 0, z: 385.188, name: "\u5E95\u5EA7-\u81C21\u65CB\u8F6C\u8F74\u5FC3" },
-    arm1Arm2: { x: -450.742, y: 0, z: 3782.1, name: "\u81C21-\u81C22\u65CB\u8F6C\u8F74\u5FC3" },
-    arm2Arm3: { x: 2596.265, y: 0, z: 3782.1, name: "\u81C22-\u81C23\u65CB\u8F6C\u8F74\u5FC3" },
-    arm3Tool: { x: 2596.265, y: 0, z: 1728.536, name: "\u81C23-\u6253\u5370\u5934\u65CB\u8F6C\u8F74\u5FC3" }
+    arm1Arm2: { x: -450.742, y: 0, z: 3782.177, name: "\u81C21-\u81C22\u65CB\u8F6C\u8F74\u5FC3" },
+    arm2Arm3: { x: 2596.265, y: 0, z: 3782.177, name: "\u81C22-\u81C23\u65CB\u8F6C\u8F74\u5FC3" },
+    arm3Tool: { x: 2596.265, y: 0, z: 1728.613, name: "\u81C23-\u6253\u5370\u5934\u65CB\u8F6C\u8F74\u5FC3" }
   };
   var TOOL_LENGTH_MM = 730;
   function distance(a, b) {
@@ -26512,13 +26512,13 @@ void main() {
       link1: {
         label: "\u8FDE\u6746B-1",
         length: 392,
-        anchorWorldAtCalibration: { x: 2551, y: 0, z: 3988.9 },
+        anchorWorldAtCalibration: { x: 2548.758, y: 0, z: 3988.982 },
         anchorOn: "arm2"
       },
       link2: {
         label: "\u8FDE\u6746B-2",
         length: 168,
-        anchorWorldAtCalibration: { x: 2627.74, y: 0, z: 3570.291 },
+        anchorWorldAtCalibration: { x: 2627.74, y: 0, z: 3507.291 },
         anchorOn: "arm3"
       }
     }
@@ -27373,7 +27373,7 @@ void main() {
   }
 
   // outputs/html-version/app.mjs
-  var SCRIPT_VERSION = "20260717-initial-print-preset";
+  var SCRIPT_VERSION = "20260717-geometry-coordinates";
   var RENDER_SCALE = 1 / 1e3;
   var QT_STAGE_MODE = new URLSearchParams(window.location.search).has("qtStage");
   if (QT_STAGE_MODE) document.documentElement.dataset.qtStage = "true";

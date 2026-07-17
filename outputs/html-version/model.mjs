@@ -1,7 +1,7 @@
 export const LIMITS = {
   arm1: { min: 0, max: 83.8189, label: "臂1" },
-  arm2: { min: 16.039, max: 177.9769, label: "臂2" },
-  arm3: { min: 2.1446, max: 180, label: "臂3" },
+  arm2: { min: 16.0271, max: 177.9644, label: "臂2" },
+  arm3: { min: 10.4567, max: 180, label: "臂3" },
   offset: { min: -55, max: 150, label: "打印头" },
   base: { min: -180, max: 180, label: "旋转" },
 };
@@ -101,9 +101,9 @@ export const IMPROVED_IK_SMOOTHNESS_MU = IMPROVED_IK_PARAMS.smoothnessMu;
 
 export const JOINTS = {
   baseArm1: { x: -450.742, y: 0, z: 385.188, name: "底座-臂1旋转轴心" },
-  arm1Arm2: { x: -450.742, y: 0, z: 3782.1, name: "臂1-臂2旋转轴心" },
-  arm2Arm3: { x: 2596.265, y: 0, z: 3782.1, name: "臂2-臂3旋转轴心" },
-  arm3Tool: { x: 2596.265, y: 0, z: 1728.536, name: "臂3-打印头旋转轴心" },
+  arm1Arm2: { x: -450.742, y: 0, z: 3782.177, name: "臂1-臂2旋转轴心" },
+  arm2Arm3: { x: 2596.265, y: 0, z: 3782.177, name: "臂2-臂3旋转轴心" },
+  arm3Tool: { x: 2596.265, y: 0, z: 1728.613, name: "臂3-打印头旋转轴心" },
 };
 
 export const TOOL_LENGTH_MM = 730;
@@ -194,13 +194,13 @@ export const LINKAGE_GROUPS = {
     link1: {
       label: "连杆B-1",
       length: 392,
-      anchorWorldAtCalibration: { x: 2551.0, y: 0, z: 3988.9 },
+      anchorWorldAtCalibration: { x: 2548.758, y: 0, z: 3988.982 },
       anchorOn: "arm2",
     },
     link2: {
       label: "连杆B-2",
       length: 168,
-      anchorWorldAtCalibration: { x: 2627.74, y: 0, z: 3570.291 },
+      anchorWorldAtCalibration: { x: 2627.74, y: 0, z: 3507.291 },
       anchorOn: "arm3",
     },
   },

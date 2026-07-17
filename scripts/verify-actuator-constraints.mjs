@@ -3,6 +3,7 @@ import { performance } from "node:perf_hooks";
 import {
   ACTIVE5_DLS_IK_PARAMS,
   ACTUATOR_STROKE_LIMITS,
+  ARM_LENGTHS_MM,
   BALANCED_IK_PARAMS,
   CALIBRATION_STATE,
   DEFAULT_STATE,
@@ -11,6 +12,8 @@ import {
   IK_CONTINUITY_WEIGHTS,
   IMPROVED_IK_REFERENCE_DEG,
   IMPROVED_IK_PARAMS,
+  JOINTS,
+  LINKAGE_GROUPS,
   LIMITS,
   PHI_SCAN_IK_PARAMS,
   PRESETS,
@@ -35,10 +38,27 @@ assert.equal(clampState({ ...DEFAULT_STATE, offset: 180 }).offset, 150, "print h
 assert.deepEqual({ min: LIMITS.base.min, max: LIMITS.base.max }, { min: -180, max: 180 }, "base angle range");
 assertNear(LIMITS.arm1.max, 83.8189, "arm1 max angle from corrected actuator/joint limit", 0.01);
 assert.equal(clampState({ ...DEFAULT_STATE, arm1: 128 }).arm1, LIMITS.arm1.max, "arm1 clamp should use actuator-derived max angle");
-assertNear(LIMITS.arm2.min, 16.039, "arm2 min angle", 0.001);
-assertNear(LIMITS.arm2.max, 177.9769, "arm2 max angle", 0.001);
-assertNear(LIMITS.arm3.min, 2.1446, "arm3 min angle", 0.001);
+assertNear(LIMITS.arm2.min, 16.0271, "arm2 min angle", 0.001);
+assertNear(LIMITS.arm2.max, 177.9644, "arm2 max angle", 0.001);
+assertNear(LIMITS.arm3.min, 10.4567, "arm3 min angle", 0.001);
 assertNear(LIMITS.arm3.max, 180, "arm3 max angle", 0.001);
+assertNear(JOINTS.baseArm1.x, -450.742, "base-arm1 world X", 0.001);
+assertNear(JOINTS.baseArm1.z, 385.188, "base-arm1 world Z", 0.001);
+assertNear(JOINTS.arm1Arm2.x, -450.742, "arm1-arm2 world X", 0.001);
+assertNear(JOINTS.arm1Arm2.z, 3782.177, "arm1-arm2 world Z", 0.001);
+assertNear(JOINTS.arm2Arm3.x, 2596.265, "arm2-arm3 world X", 0.001);
+assertNear(JOINTS.arm2Arm3.z, 3782.177, "arm2-arm3 world Z", 0.001);
+assertNear(JOINTS.arm3Tool.x, 2596.265, "arm3-tool world X", 0.001);
+assertNear(JOINTS.arm3Tool.z, 1728.613, "arm3-tool world Z preserving arm3 length", 0.001);
+assertNear(ARM_LENGTHS_MM.arm1, 3396.989, "arm1 axis distance from corrected origins", 0.001);
+assertNear(ARM_LENGTHS_MM.arm2, 3047.007, "arm2 axis distance", 0.001);
+assertNear(ARM_LENGTHS_MM.arm3, 2053.564, "arm3 axis distance", 0.001);
+assertNear(LINKAGE_GROUPS.B.commonWorldAtCalibration.x, 2488.713, "linkage B common X", 0.001);
+assertNear(LINKAGE_GROUPS.B.commonWorldAtCalibration.z, 3601.608, "linkage B common Z", 0.001);
+assertNear(LINKAGE_GROUPS.B.link1.anchorWorldAtCalibration.x, 2548.758, "linkage B link1 anchor X", 0.001);
+assertNear(LINKAGE_GROUPS.B.link1.anchorWorldAtCalibration.z, 3988.982, "linkage B link1 anchor Z", 0.001);
+assertNear(LINKAGE_GROUPS.B.link2.anchorWorldAtCalibration.x, 2627.74, "linkage B link2 anchor X", 0.001);
+assertNear(LINKAGE_GROUPS.B.link2.anchorWorldAtCalibration.z, 3507.291, "linkage B link2 anchor Z", 0.001);
 assert.deepEqual(
   computePose(CALIBRATION_STATE, { clampLimits: false }).absoluteAngles,
   { arm1: 90, arm2: 0, arm3: -90, tool: -90 },
