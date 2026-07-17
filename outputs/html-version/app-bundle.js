@@ -26353,6 +26353,11 @@ void main() {
       values: { arm1: 90, arm2: 90, arm3: 90, offset: 0, base: 0 },
       keepToolVertical: true
     },
+    initialPrint: {
+      label: "\u521D\u59CB\u6253\u5370\u59FF\u6001",
+      values: { arm1: 81, arm2: 72, arm3: 49, offset: 50, base: 4 },
+      keepToolVertical: true
+    },
     folded: {
       label: "\u6298\u53E0\u59FF\u6001",
       values: { arm1: 0, arm2: 180, arm3: 180, offset: 0, base: 180 },
@@ -27368,7 +27373,7 @@ void main() {
   }
 
   // outputs/html-version/app.mjs
-  var SCRIPT_VERSION = "20260717-printhead-range";
+  var SCRIPT_VERSION = "20260717-initial-print-preset";
   var RENDER_SCALE = 1 / 1e3;
   var QT_STAGE_MODE = new URLSearchParams(window.location.search).has("qtStage");
   if (QT_STAGE_MODE) document.documentElement.dataset.qtStage = "true";
@@ -28957,8 +28962,7 @@ void main() {
     return roundedWorldPoint(worldDisplayedToolPointForState(state, TOOL_BALL_STICK_OFFSET_MM));
   }
   function verticalPoseState() {
-    const actuatorReady = stateFromActuatorStrokes({ arm1: 1 }, applyPreset("calibration", DEFAULT_STATE));
-    return clampState({ ...actuatorReady, offset: verticalToolOffsetForState2(actuatorReady) });
+    return applyPreset("initialPrint", DEFAULT_STATE);
   }
   function verticalPoseToolWorld() {
     return roundedWorldPoint(worldDisplayedToolPointForState(verticalPoseState(), TOOL_BALL_STICK_OFFSET_MM));

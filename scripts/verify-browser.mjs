@@ -101,6 +101,10 @@ try {
       numberMin: document.querySelector("#offsetNumber")?.min,
       numberMax: document.querySelector("#offsetNumber")?.max,
     },
+    presets: Array.from(document.querySelectorAll(".preset-button")).map((button) => ({
+      label: button.querySelector("strong")?.textContent,
+      values: button.querySelector("span")?.textContent,
+    })),
     debug: window.__lingzhuDebug.importedLinearPath,
     pathRender: window.__lingzhuDebug.pathRender,
   }));
@@ -139,6 +143,36 @@ try {
     defaultResult.toolRange?.numberMax !== "150"
   ) {
     throw new Error(`Print head controls must expose -55..150 degree range: ${JSON.stringify(defaultResult, null, 2)}`);
+  }
+  if (!defaultResult.presets?.some((preset) => preset.label === "初始打印姿态" && preset.values === "81 / 72 / 49 / 50 / 4")) {
+    throw new Error(`Preset controls must expose the initial print pose: ${JSON.stringify(defaultResult, null, 2)}`);
+  }
+
+  await page.evaluate(() => {
+    const button = Array.from(document.querySelectorAll(".preset-button")).find((item) =>
+      item.querySelector("strong")?.textContent === "初始打印姿态"
+    );
+    button?.click();
+  });
+  const initialPrintPresetResult = await page.evaluate(() => ({
+    pose: {
+      arm1: window.__lingzhuDebug.pose?.arm1,
+      arm2: window.__lingzhuDebug.pose?.arm2,
+      arm3: window.__lingzhuDebug.pose?.arm3,
+      offset: window.__lingzhuDebug.pose?.offset,
+      base: window.__lingzhuDebug.pose?.base,
+    },
+    keepToolVerticalChecked: document.querySelector("#keepToolVertical")?.checked,
+  }));
+  if (
+    Math.abs(initialPrintPresetResult.pose.arm1 - 81) > 0.001 ||
+    Math.abs(initialPrintPresetResult.pose.arm2 - 72) > 0.001 ||
+    Math.abs(initialPrintPresetResult.pose.arm3 - 49) > 0.001 ||
+    Math.abs(initialPrintPresetResult.pose.offset - 50) > 0.001 ||
+    Math.abs(initialPrintPresetResult.pose.base - 4) > 0.001 ||
+    initialPrintPresetResult.keepToolVerticalChecked !== true
+  ) {
+    throw new Error(`Initial print preset must apply the requested pose: ${JSON.stringify(initialPrintPresetResult, null, 2)}`);
   }
 
   await page.click('[data-theme-choice="light"]');
@@ -227,6 +261,16 @@ try {
   );
   if (simulationPath.length !== 4 || pathStartsAtImportedPoint || !secondPointIsImportedStart) {
     throw new Error(`Imported path must be prefixed by the fixed vertical-pose point: ${JSON.stringify(result, null, 2)}`);
+  }
+  const importedPathStartState = result.linearMotion?.startState || {};
+  const startsFromInitialPrintPose =
+    Math.abs(Number(importedPathStartState.arm1) - 81) < 0.001 &&
+    Math.abs(Number(importedPathStartState.arm2) - 72) < 0.001 &&
+    Math.abs(Number(importedPathStartState.arm3) - 49) < 0.001 &&
+    Math.abs(Number(importedPathStartState.offset) - 50) < 0.001 &&
+    Math.abs(Number(importedPathStartState.base) - 4) < 0.001;
+  if (!startsFromInitialPrintPose) {
+    throw new Error(`Imported path simulation must start from the initial print pose: ${JSON.stringify(result, null, 2)}`);
   }
   if (result.actuatorBallStickOnly !== true || result.actuatorBallStickOnlyChecked !== true) {
     throw new Error(`Actuator-only ball-stick mode must be enabled by default: ${JSON.stringify(result, null, 2)}`);

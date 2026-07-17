@@ -23,6 +23,11 @@ export const PRESETS = {
     values: { arm1: 90, arm2: 90, arm3: 90, offset: 0, base: 0 },
     keepToolVertical: true,
   },
+  initialPrint: {
+    label: "初始打印姿态",
+    values: { arm1: 81, arm2: 72, arm3: 49, offset: 50, base: 4 },
+    keepToolVertical: true,
+  },
   folded: {
     label: "折叠姿态",
     values: { arm1: 0, arm2: 180, arm3: 180, offset: 0, base: 180 },

@@ -13,6 +13,7 @@ import {
   IMPROVED_IK_PARAMS,
   LIMITS,
   PHI_SCAN_IK_PARAMS,
+  PRESETS,
   clampState,
   computePose,
   solveStateForWorldDisplayedToolTarget,
@@ -44,6 +45,20 @@ assert.deepEqual(
   "calibration pose must remain the original unclamped GLB/linkage reference",
 );
 assertNear(computePose(DEFAULT_STATE).arm1, LIMITS.arm1.max, "runtime default pose should still clamp to arm1 limit", 0.001);
+assert.deepEqual(
+  PRESETS.initialPrint,
+  {
+    label: "初始打印姿态",
+    values: { arm1: 81, arm2: 72, arm3: 49, offset: 50, base: 4 },
+    keepToolVertical: true,
+  },
+  "initial print preset should match the requested startup print pose",
+);
+assert.equal(
+  PRESETS.initialPrint.values.arm1 - PRESETS.initialPrint.values.arm2 - PRESETS.initialPrint.values.arm3 + 90,
+  PRESETS.initialPrint.values.offset,
+  "initial print preset should keep the printhead vertical",
+);
 assert.deepEqual(
   IMPROVED_IK_REFERENCE_DEG,
   { arm1: 90, arm2: 120, arm3: 60, offset: 0 },
