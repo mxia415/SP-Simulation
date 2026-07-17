@@ -121,6 +121,23 @@ try {
     })),
     debug: window.__lingzhuDebug.importedLinearPath,
     pathRender: window.__lingzhuDebug.pathRender,
+    scriptVersion: window.__lingzhuDebug.scriptVersion,
+    glbAnchorErrors: Object.keys(window.__lingzhuDebug)
+      .filter((key) => key.endsWith("Model"))
+      .map((key) => {
+        const model = window.__lingzhuDebug[key];
+        const modelAnchor = model?.modelAnchorWorld;
+        const targetAnchor = model?.targetAnchorWorld;
+        const error = modelAnchor && targetAnchor
+          ? Math.hypot(
+              (modelAnchor.x || 0) - (targetAnchor.x || 0),
+              (modelAnchor.y || 0) - (targetAnchor.y || 0),
+              (modelAnchor.z || 0) - (targetAnchor.z || 0),
+            )
+          : null;
+        return { key, follows: model?.follows, error };
+      })
+      .filter((item) => item.follows && item.error !== null),
   }));
 
   if (!defaultResult.modeButtonActive || !defaultResult.debug?.active || defaultResult.debug?.pointCount !== 127) {
@@ -128,6 +145,13 @@ try {
   }
   if (defaultResult.ikMode !== "active5_dls") {
     throw new Error(`Default IK mode must be Active-5 3D DLS for imported path simulation: ${JSON.stringify(defaultResult, null, 2)}`);
+  }
+  if (defaultResult.scriptVersion !== "20260717-glb-refollow-geometry") {
+    throw new Error(`Script version must cache-bust the GLB refollow update: ${JSON.stringify(defaultResult, null, 2)}`);
+  }
+  const glbAnchorMiss = defaultResult.glbAnchorErrors.find((item) => item.error > 0.001);
+  if (glbAnchorMiss) {
+    throw new Error(`GLB follow anchors must remain attached to the corrected ball-stick coordinates: ${JSON.stringify(defaultResult, null, 2)}`);
   }
   if (defaultResult.theme !== "dark") {
     throw new Error(`Default theme must remain dark: ${JSON.stringify(defaultResult, null, 2)}`);
