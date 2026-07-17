@@ -27373,7 +27373,7 @@ void main() {
   }
 
   // outputs/html-version/app.mjs
-  var SCRIPT_VERSION = "20260717-geometry-v13";
+  var SCRIPT_VERSION = "20260717-loading-cache-v14";
   var RENDER_SCALE = 1 / 1e3;
   var QT_STAGE_MODE = new URLSearchParams(window.location.search).has("qtStage");
   if (QT_STAGE_MODE) document.documentElement.dataset.qtStage = "true";
@@ -28311,6 +28311,31 @@ void main() {
     "link_b2_mid.glb": "linkB2Mid"
   };
   window.__lingzhuModelLoadErrors = [];
+  var GLB_LOAD_CONCURRENCY = 3;
+  var GLB_LOAD_ORDER = [
+    "base",
+    "baseLink",
+    "arm1",
+    "arm2",
+    "arm3",
+    "tool",
+    "cyl1XnBase",
+    "cyl1XpBase",
+    "cyl1XnEnd",
+    "cyl1XpEnd",
+    "cyl2XnBase",
+    "cyl2XpBase",
+    "cyl2XnEnd",
+    "cyl2XpEnd",
+    "cyl3MidBase",
+    "cyl3MidEnd",
+    "linkA1Xn",
+    "linkA1Xp",
+    "linkA2Mid",
+    "linkB1Xp",
+    "linkB1Xn",
+    "linkB2Mid"
+  ];
   function makeModelController(key, label, glbPath, fallbackPath, fallbackKey, initialState, follows, options = {}) {
     const group = new Group();
     const model = new Group();
@@ -29811,6 +29836,33 @@ void main() {
     }
     update();
   }
+  async function loadModelsInQueue(controllers, concurrency = GLB_LOAD_CONCURRENCY) {
+    const queue = controllers.filter(Boolean);
+    let cursor = 0;
+    async function worker() {
+      while (cursor < queue.length) {
+        const controller = queue[cursor];
+        cursor += 1;
+        const status = document.querySelector(`#${controller.key}ModelStatus`);
+        if (status && !controller.loaded) status.textContent = "\u52A0\u8F7D\u4E2D";
+        await loadModel(controller);
+      }
+    }
+    const workerCount = Math.min(Math.max(1, concurrency), queue.length);
+    await Promise.all(Array.from({ length: workerCount }, worker));
+  }
+  function orderedModelControllers() {
+    const seen = /* @__PURE__ */ new Set();
+    const ordered = GLB_LOAD_ORDER.map((key) => modelControllers[key]).filter((controller) => {
+      if (!controller || seen.has(controller.key)) return false;
+      seen.add(controller.key);
+      return true;
+    });
+    for (const controller of Object.values(modelControllers)) {
+      if (!seen.has(controller.key)) ordered.push(controller);
+    }
+    return ordered;
+  }
   function applyControllerTransform(controller, pose) {
     const s = controller.state;
     controller.group.visible = s.visible;
@@ -30228,7 +30280,9 @@ void main() {
   createMetrics();
   Object.values(modelControllers).forEach((controller) => {
     bindModelControls(controller);
-    loadModel(controller);
+  });
+  requestAnimationFrame(() => {
+    loadModelsInQueue(orderedModelControllers());
   });
   document.querySelector("#resetButton").addEventListener("click", () => {
     stopLinearSimulation();
