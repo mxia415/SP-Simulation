@@ -26333,8 +26333,8 @@ void main() {
   // outputs/html-version/model.mjs
   var LIMITS = {
     arm1: { min: 0, max: 83.8189, label: "\u81C21" },
-    arm2: { min: 5, max: 180, label: "\u81C22" },
-    arm3: { min: -10, max: 180, label: "\u81C23" },
+    arm2: { min: 16.039, max: 177.9769, label: "\u81C22" },
+    arm3: { min: 2.1446, max: 180, label: "\u81C23" },
     offset: { min: -60, max: 85, label: "\u6253\u5370\u5934" },
     base: { min: -180, max: 180, label: "\u65CB\u8F6C" }
   };
@@ -27365,7 +27365,7 @@ void main() {
   }
 
   // outputs/html-version/app.mjs
-  var SCRIPT_VERSION = "20260717-actuator-joint-params";
+  var SCRIPT_VERSION = "20260717-joint-range-params";
   var RENDER_SCALE = 1 / 1e3;
   var QT_STAGE_MODE = new URLSearchParams(window.location.search).has("qtStage");
   if (QT_STAGE_MODE) document.documentElement.dataset.qtStage = "true";

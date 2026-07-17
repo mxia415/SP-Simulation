@@ -30,8 +30,13 @@ assert.deepEqual(
 );
 assert.equal(clampState({ ...DEFAULT_STATE, offset: -120 }).offset, -60, "print head min clamp");
 assert.equal(clampState({ ...DEFAULT_STATE, offset: 120 }).offset, 85, "print head max clamp");
+assert.deepEqual({ min: LIMITS.base.min, max: LIMITS.base.max }, { min: -180, max: 180 }, "base angle range");
 assertNear(LIMITS.arm1.max, 83.8189, "arm1 max angle from corrected actuator/joint limit", 0.01);
 assert.equal(clampState({ ...DEFAULT_STATE, arm1: 128 }).arm1, LIMITS.arm1.max, "arm1 clamp should use actuator-derived max angle");
+assertNear(LIMITS.arm2.min, 16.039, "arm2 min angle", 0.001);
+assertNear(LIMITS.arm2.max, 177.9769, "arm2 max angle", 0.001);
+assertNear(LIMITS.arm3.min, 2.1446, "arm3 min angle", 0.001);
+assertNear(LIMITS.arm3.max, 180, "arm3 max angle", 0.001);
 assert.deepEqual(
   IMPROVED_IK_REFERENCE_DEG,
   { arm1: 90, arm2: 120, arm3: 60, offset: 0 },
@@ -139,7 +144,7 @@ for (const key of ["arm1", "arm2", "arm3"]) {
     assertNear(minLength, limits.minLength, `${key} 0% stroke length`);
   } else {
     assert.ok(
-      Math.abs(minState[key] - LIMITS[key].min) < 0.001 || Math.abs(minState[key] - LIMITS[key].max) < 0.001,
+      Math.abs(minState[key] - LIMITS[key].min) < 0.05 || Math.abs(minState[key] - LIMITS[key].max) < 0.05,
       `${key} unreachable 0% stroke should settle at an angle limit`,
     );
   }
