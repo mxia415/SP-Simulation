@@ -79,6 +79,13 @@ try {
     null,
     { timeout: 10000 },
   );
+  await page.waitForFunction(
+    () => Object.keys(window.__lingzhuDebug || {})
+      .filter((key) => key.endsWith("Model"))
+      .every((key) => window.__lingzhuDebug[key]?.loaded),
+    null,
+    { timeout: 30000 },
+  );
 
   const defaultResult = await page.evaluate(() => ({
     modeButtonActive: document.querySelector("#linearModeButton")?.classList.contains("is-active"),
@@ -146,8 +153,8 @@ try {
   if (defaultResult.ikMode !== "active5_dls") {
     throw new Error(`Default IK mode must be Active-5 3D DLS for imported path simulation: ${JSON.stringify(defaultResult, null, 2)}`);
   }
-  if (defaultResult.scriptVersion !== "20260717-glb-refollow-geometry") {
-    throw new Error(`Script version must cache-bust the GLB refollow update: ${JSON.stringify(defaultResult, null, 2)}`);
+  if (defaultResult.scriptVersion !== "20260717-draco-v15") {
+    throw new Error(`Script version must cache-bust the Draco GLB update: ${JSON.stringify(defaultResult, null, 2)}`);
   }
   const glbAnchorMiss = defaultResult.glbAnchorErrors.find((item) => item.error > 0.001);
   if (glbAnchorMiss) {

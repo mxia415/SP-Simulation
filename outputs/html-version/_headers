@@ -16,5 +16,9 @@
 /assets/*.js
   Cache-Control: public, max-age=31536000, immutable
 
+/assets/*.wasm
+  Cache-Control: public, max-age=31536000, immutable
+  Content-Type: application/wasm
+
 /assets/paths/*
   Cache-Control: no-cache

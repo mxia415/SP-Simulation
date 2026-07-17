@@ -1,5 +1,6 @@
 import * as THREE from "three";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
+import { DRACOLoader } from "three/addons/loaders/DRACOLoader.js";
 import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
 import { MeshoptDecoder } from "three/addons/libs/meshopt_decoder.module.js";
 import { Line2 } from "three/addons/lines/Line2.js";
@@ -31,7 +32,7 @@ import {
   sceneToDevicePointData,
 } from "./coordinates.mjs";
 
-const SCRIPT_VERSION = "20260717-loading-cache-v14";
+const SCRIPT_VERSION = "20260717-draco-v15";
 const RENDER_SCALE = 1 / 1000;
 const QT_STAGE_MODE = new URLSearchParams(window.location.search).has("qtStage");
 if (QT_STAGE_MODE) document.documentElement.dataset.qtStage = "true";
@@ -2705,6 +2706,9 @@ async function loadModel(controller) {
     }
     controller.stats.bytes = buffer.byteLength;
     const loader = new GLTFLoader();
+    const dracoLoader = new DRACOLoader();
+    dracoLoader.setDecoderPath("assets/draco/gltf/");
+    loader.setDRACOLoader(dracoLoader);
     loader.setMeshoptDecoder(MeshoptDecoder);
     const gltf = await new Promise((resolve, reject) => loader.parse(buffer, "", resolve, reject));
     controller.model.add(gltf.scene);
