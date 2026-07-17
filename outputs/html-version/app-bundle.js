@@ -26582,6 +26582,9 @@ void main() {
   }
   function absoluteAnglesForState(rawState) {
     const state2 = clampState(rawState);
+    return absoluteAnglesForRawState(state2);
+  }
+  function absoluteAnglesForRawState(state2) {
     const arm1 = state2.arm1;
     const arm2 = state2.arm1 - state2.arm2;
     const arm3 = state2.arm1 - state2.arm2 - state2.arm3;
@@ -26589,7 +26592,7 @@ void main() {
     return { arm1, arm2, arm3, tool };
   }
   function calibrationFrames() {
-    const angles = absoluteAnglesForState(CALIBRATION_STATE);
+    const angles = absoluteAnglesForRawState(CALIBRATION_STATE);
     return {
       arm1: { origin: JOINTS.baseArm1, angle: angles.arm1 },
       arm2: { origin: JOINTS.arm1Arm2, angle: angles.arm2 },
@@ -26785,9 +26788,9 @@ void main() {
       instances: makeLinkageInstances(group, center)
     };
   }
-  function computePose(rawState) {
-    const state2 = clampState(rawState);
-    const absoluteAngles = absoluteAnglesForState(state2);
+  function computePose(rawState, options = {}) {
+    const state2 = options.clampLimits === false ? { ...rawState } : clampState(rawState);
+    const absoluteAngles = absoluteAnglesForRawState(state2);
     const joints = [
       { ...JOINTS.baseArm1 },
       transformLocalPoint(JOINTS.baseArm1, absoluteAngles.arm1, { x: ARM_LENGTHS_MM.arm1, y: 0, z: 0, name: "\u81C21" })
@@ -27365,7 +27368,7 @@ void main() {
   }
 
   // outputs/html-version/app.mjs
-  var SCRIPT_VERSION = "20260717-joint-range-params";
+  var SCRIPT_VERSION = "20260717-glb-calibration-pose";
   var RENDER_SCALE = 1 / 1e3;
   var QT_STAGE_MODE = new URLSearchParams(window.location.search).has("qtStage");
   if (QT_STAGE_MODE) document.documentElement.dataset.qtStage = "true";
@@ -27572,7 +27575,7 @@ void main() {
   var actuatorBallStickOnly = true;
   var keepToolVertical = true;
   var hasFramedInitialModel = false;
-  var arm1ReferencePose = computePose(DEFAULT_STATE);
+  var arm1ReferencePose = computePose(CALIBRATION_STATE, { clampLimits: false });
   var arm1ReferenceSegment = arm1ReferencePose.segments.find((segment) => segment.key === "arm1");
   var arm2ReferenceSegment = arm1ReferencePose.segments.find((segment) => segment.key === "arm2");
   var arm3ReferenceSegment = arm1ReferencePose.segments.find((segment) => segment.key === "arm3");

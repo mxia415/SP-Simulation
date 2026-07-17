@@ -275,6 +275,10 @@ export function transformLocalPoint(origin, angleDegrees, localPoint) {
 
 export function absoluteAnglesForState(rawState) {
   const state = clampState(rawState);
+  return absoluteAnglesForRawState(state);
+}
+
+function absoluteAnglesForRawState(state) {
   const arm1 = state.arm1;
   const arm2 = state.arm1 - state.arm2;
   const arm3 = state.arm1 - state.arm2 - state.arm3;
@@ -283,7 +287,7 @@ export function absoluteAnglesForState(rawState) {
 }
 
 function calibrationFrames() {
-  const angles = absoluteAnglesForState(CALIBRATION_STATE);
+  const angles = absoluteAnglesForRawState(CALIBRATION_STATE);
   return {
     arm1: { origin: JOINTS.baseArm1, angle: angles.arm1 },
     arm2: { origin: JOINTS.arm1Arm2, angle: angles.arm2 },
@@ -494,9 +498,9 @@ function computeLinkage(pose, group) {
   };
 }
 
-export function computePose(rawState) {
-  const state = clampState(rawState);
-  const absoluteAngles = absoluteAnglesForState(state);
+export function computePose(rawState, options = {}) {
+  const state = options.clampLimits === false ? { ...rawState } : clampState(rawState);
+  const absoluteAngles = absoluteAnglesForRawState(state);
   const joints = [
     { ...JOINTS.baseArm1 },
     transformLocalPoint(JOINTS.baseArm1, absoluteAngles.arm1, { x: ARM_LENGTHS_MM.arm1, y: 0, z: 0, name: "臂1" }),

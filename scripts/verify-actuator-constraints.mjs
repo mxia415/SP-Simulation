@@ -4,6 +4,7 @@ import {
   ACTIVE5_DLS_IK_PARAMS,
   ACTUATOR_STROKE_LIMITS,
   BALANCED_IK_PARAMS,
+  CALIBRATION_STATE,
   DEFAULT_STATE,
   IK_DQ_LIMIT_DEG,
   IK_MODES,
@@ -37,6 +38,12 @@ assertNear(LIMITS.arm2.min, 16.039, "arm2 min angle", 0.001);
 assertNear(LIMITS.arm2.max, 177.9769, "arm2 max angle", 0.001);
 assertNear(LIMITS.arm3.min, 2.1446, "arm3 min angle", 0.001);
 assertNear(LIMITS.arm3.max, 180, "arm3 max angle", 0.001);
+assert.deepEqual(
+  computePose(CALIBRATION_STATE, { clampLimits: false }).absoluteAngles,
+  { arm1: 90, arm2: 0, arm3: -90, tool: -90 },
+  "calibration pose must remain the original unclamped GLB/linkage reference",
+);
+assertNear(computePose(DEFAULT_STATE).arm1, LIMITS.arm1.max, "runtime default pose should still clamp to arm1 limit", 0.001);
 assert.deepEqual(
   IMPROVED_IK_REFERENCE_DEG,
   { arm1: 90, arm2: 120, arm3: 60, offset: 0 },

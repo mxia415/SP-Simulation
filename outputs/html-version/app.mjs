@@ -8,6 +8,7 @@ import { LineMaterial } from "three/addons/lines/LineMaterial.js";
 import {
   ACTUATOR_GROUPS,
   ACTUATOR_STROKE_LIMITS,
+  CALIBRATION_STATE,
   DEFAULT_STATE,
   JOINTS,
   LIMITS,
@@ -30,7 +31,7 @@ import {
   sceneToDevicePointData,
 } from "./coordinates.mjs";
 
-const SCRIPT_VERSION = "20260717-joint-range-params";
+const SCRIPT_VERSION = "20260717-glb-calibration-pose";
 const RENDER_SCALE = 1 / 1000;
 const QT_STAGE_MODE = new URLSearchParams(window.location.search).has("qtStage");
 if (QT_STAGE_MODE) document.documentElement.dataset.qtStage = "true";
@@ -240,7 +241,7 @@ let modelEffect = QT_STAGE_MODE ? "transparent" : "solid";
 let actuatorBallStickOnly = true;
 let keepToolVertical = true;
 let hasFramedInitialModel = false;
-const arm1ReferencePose = computePose(DEFAULT_STATE);
+const arm1ReferencePose = computePose(CALIBRATION_STATE, { clampLimits: false });
 const arm1ReferenceSegment = arm1ReferencePose.segments.find((segment) => segment.key === "arm1");
 const arm2ReferenceSegment = arm1ReferencePose.segments.find((segment) => segment.key === "arm2");
 const arm3ReferenceSegment = arm1ReferencePose.segments.find((segment) => segment.key === "arm3");
