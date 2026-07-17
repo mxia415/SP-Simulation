@@ -133,12 +133,12 @@ try {
     throw new Error(`Default imported cuboid path must not show point markers: ${JSON.stringify(defaultResult, null, 2)}`);
   }
   if (
-    defaultResult.toolRange?.sliderMin !== "-60" ||
-    defaultResult.toolRange?.sliderMax !== "85" ||
-    defaultResult.toolRange?.numberMin !== "-60" ||
-    defaultResult.toolRange?.numberMax !== "85"
+    defaultResult.toolRange?.sliderMin !== "-55" ||
+    defaultResult.toolRange?.sliderMax !== "150" ||
+    defaultResult.toolRange?.numberMin !== "-55" ||
+    defaultResult.toolRange?.numberMax !== "150"
   ) {
-    throw new Error(`Print head controls must expose -60..85 degree range: ${JSON.stringify(defaultResult, null, 2)}`);
+    throw new Error(`Print head controls must expose -55..150 degree range: ${JSON.stringify(defaultResult, null, 2)}`);
   }
 
   await page.click('[data-theme-choice="light"]');

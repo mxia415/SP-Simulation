@@ -26,11 +26,11 @@ const EXPECTED_MIN_LENGTHS = { arm1: 1280.7, arm2: 1180.9, arm3: 1365 };
 
 assert.deepEqual(
   { min: LIMITS.offset.min, max: LIMITS.offset.max },
-  { min: -60, max: 85 },
+  { min: -55, max: 150 },
   "print head angle range",
 );
-assert.equal(clampState({ ...DEFAULT_STATE, offset: -120 }).offset, -60, "print head min clamp");
-assert.equal(clampState({ ...DEFAULT_STATE, offset: 120 }).offset, 85, "print head max clamp");
+assert.equal(clampState({ ...DEFAULT_STATE, offset: -120 }).offset, -55, "print head min clamp");
+assert.equal(clampState({ ...DEFAULT_STATE, offset: 180 }).offset, 150, "print head max clamp");
 assert.deepEqual({ min: LIMITS.base.min, max: LIMITS.base.max }, { min: -180, max: 180 }, "base angle range");
 assertNear(LIMITS.arm1.max, 83.8189, "arm1 max angle from corrected actuator/joint limit", 0.01);
 assert.equal(clampState({ ...DEFAULT_STATE, arm1: 128 }).arm1, LIMITS.arm1.max, "arm1 clamp should use actuator-derived max angle");
