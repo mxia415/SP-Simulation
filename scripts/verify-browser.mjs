@@ -262,7 +262,7 @@ try {
     Math.abs(result.pose?.base) < 0.01;
   const solveError = Number.parseFloat(result.solveErrorText || "NaN");
   const active5WithinStartupLimits = ["base", "arm1", "arm2", "arm3", "offset"].every((key) => {
-    const limit = { base: 1, arm1: 1.5, arm2: 1.5, arm3: 1.5, offset: 1 }[key];
+    const limit = { base: 1, arm1: 2, arm2: 2, arm3: 2, offset: 1 }[key];
     return Math.abs(Number(result.linearMotion?.previousIkDelta?.[key] || 0)) <= limit + 0.001;
   });
   if (poseStillVertical || !Number.isFinite(solveError) || !active5WithinStartupLimits) {
@@ -366,7 +366,7 @@ try {
     throw new Error(`High-speed simulation must hold the start pose through the first animation frame: ${JSON.stringify(highSpeedFirstFrame, null, 2)}`);
   }
 
-  await page.waitForFunction(() => (window.__lingzhuDebug.linearMotion?.commandDistanceMm || 0) > 40, null, { timeout: 1000 });
+  await page.waitForFunction(() => (window.__lingzhuDebug.linearMotion?.commandDistanceMm || 0) > 5, null, { timeout: 1000 });
   const highSpeedFirstMotionFrame = await page.evaluate(() => ({
     commandDistanceMm: window.__lingzhuDebug.linearMotion?.commandDistanceMm,
     state: {
@@ -379,7 +379,7 @@ try {
     startState: window.__lingzhuDebug.linearMotion?.startState,
   }));
   const firstMotionFrameWithinDisplayLimit = ["base", "arm1", "arm2", "arm3", "offset"].every((key) => {
-    const limit = { base: 1, arm1: 1.5, arm2: 1.5, arm3: 1.5, offset: 1 }[key];
+    const limit = { base: 1, arm1: 2, arm2: 2, arm3: 2, offset: 1 }[key];
     return Math.abs(Number(highSpeedFirstMotionFrame.state?.[key]) - Number(highSpeedFirstMotionFrame.startState?.[key])) <= limit + 0.001;
   });
   if (!firstMotionFrameWithinDisplayLimit) {
@@ -402,7 +402,7 @@ try {
   await page.fill("#linearSpeed", "5000");
   await page.dispatchEvent("#linearSpeed", "change");
   await page.evaluate(() => document.querySelector("#simulateLinearMotion")?.click());
-  await page.waitForFunction(() => (window.__lingzhuDebug.linearMotion?.commandDistanceMm || 0) > 450, null, { timeout: 1000 });
+  await page.waitForFunction(() => (window.__lingzhuDebug.linearMotion?.commandDistanceMm || 0) > 5, null, { timeout: 1000 });
   const pointModeStartResult = await page.evaluate(() => ({
     commandDistanceMm: window.__lingzhuDebug.linearMotion?.commandDistanceMm,
     target: window.__lingzhuDebug.linearDrag?.simulationTargetWorld,

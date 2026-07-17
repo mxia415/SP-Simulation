@@ -1,5 +1,5 @@
 export const LIMITS = {
-  arm1: { min: 0, max: 95.3358, label: "臂1" },
+  arm1: { min: 0, max: 83.8189, label: "臂1" },
   arm2: { min: 5, max: 180, label: "臂2" },
   arm3: { min: -10, max: 180, label: "臂3" },
   offset: { min: -60, max: 85, label: "打印头" },
@@ -120,9 +120,9 @@ const ARM1_ACTUATOR_SIDE_OFFSET_MM = 291;
 const ARM2_ACTUATOR_SIDE_OFFSET_MM = 195.5;
 
 export const ACTUATOR_STROKE_LIMITS = {
-  arm1: { minLength: 1286.6, strokeLength: 800, label: "电缸1" },
-  arm2: { minLength: 1177.9, strokeLength: 680, label: "电缸2" },
-  arm3: { minLength: 1405.8, strokeLength: 520, label: "电缸3" },
+  arm1: { minLength: 1280.7, strokeLength: 750, label: "电缸1" },
+  arm2: { minLength: 1180.9, strokeLength: 680, label: "电缸2" },
+  arm3: { minLength: 1365, strokeLength: 580, label: "电缸3" },
 };
 
 Object.values(ACTUATOR_STROKE_LIMITS).forEach((limit) => {

@@ -26332,7 +26332,7 @@ void main() {
 
   // outputs/html-version/model.mjs
   var LIMITS = {
-    arm1: { min: 0, max: 95.3358, label: "\u81C21" },
+    arm1: { min: 0, max: 83.8189, label: "\u81C21" },
     arm2: { min: 5, max: 180, label: "\u81C22" },
     arm3: { min: -10, max: 180, label: "\u81C23" },
     offset: { min: -60, max: 85, label: "\u6253\u5370\u5934" },
@@ -26441,9 +26441,9 @@ void main() {
   var ARM1_ACTUATOR_SIDE_OFFSET_MM = 291;
   var ARM2_ACTUATOR_SIDE_OFFSET_MM = 195.5;
   var ACTUATOR_STROKE_LIMITS = {
-    arm1: { minLength: 1286.6, strokeLength: 800, label: "\u7535\u7F381" },
-    arm2: { minLength: 1177.9, strokeLength: 680, label: "\u7535\u7F382" },
-    arm3: { minLength: 1405.8, strokeLength: 520, label: "\u7535\u7F383" }
+    arm1: { minLength: 1280.7, strokeLength: 750, label: "\u7535\u7F381" },
+    arm2: { minLength: 1180.9, strokeLength: 680, label: "\u7535\u7F382" },
+    arm3: { minLength: 1365, strokeLength: 580, label: "\u7535\u7F383" }
   };
   Object.values(ACTUATOR_STROKE_LIMITS).forEach((limit) => {
     limit.maxLength = Number((limit.minLength + limit.strokeLength).toFixed(3));
@@ -27365,7 +27365,7 @@ void main() {
   }
 
   // outputs/html-version/app.mjs
-  var SCRIPT_VERSION = "20260707-python-active5-dls";
+  var SCRIPT_VERSION = "20260717-actuator-joint-params";
   var RENDER_SCALE = 1 / 1e3;
   var QT_STAGE_MODE = new URLSearchParams(window.location.search).has("qtStage");
   if (QT_STAGE_MODE) document.documentElement.dataset.qtStage = "true";
@@ -28954,7 +28954,8 @@ void main() {
     return roundedWorldPoint(worldDisplayedToolPointForState(state, TOOL_BALL_STICK_OFFSET_MM));
   }
   function verticalPoseState() {
-    return clampState(applyPreset("calibration", DEFAULT_STATE));
+    const actuatorReady = stateFromActuatorStrokes({ arm1: 1 }, applyPreset("calibration", DEFAULT_STATE));
+    return clampState({ ...actuatorReady, offset: verticalToolOffsetForState2(actuatorReady) });
   }
   function verticalPoseToolWorld() {
     return roundedWorldPoint(worldDisplayedToolPointForState(verticalPoseState(), TOOL_BALL_STICK_OFFSET_MM));
