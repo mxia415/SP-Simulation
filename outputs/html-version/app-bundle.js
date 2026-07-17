@@ -27712,7 +27712,7 @@ void main() {
   }
 
   // outputs/html-version/app.mjs
-  var SCRIPT_VERSION = "20260717-draco-v16";
+  var SCRIPT_VERSION = "20260717-draco-v17";
   var RENDER_SCALE = 1 / 1e3;
   var QT_STAGE_MODE = new URLSearchParams(window.location.search).has("qtStage");
   if (QT_STAGE_MODE) document.documentElement.dataset.qtStage = "true";
@@ -27756,9 +27756,6 @@ void main() {
   dracoLoader.setDecoderConfig({ type: "wasm" });
   dracoLoader.setWorkerLimit(4);
   dracoLoader.preload();
-  var gltfLoader = new GLTFLoader();
-  gltfLoader.setDRACOLoader(dracoLoader);
-  gltfLoader.setMeshoptDecoder(MeshoptDecoder);
   var DEFAULT_CAMERA_POSITION = new Vector3(9.5, 7.2, 11.6);
   var DEFAULT_CAMERA_TARGET = new Vector3(0.8, 2.2, 0);
   var BASE_LINK_PIVOT_MM2 = { x: 118.258, y: 0, z: 0 };
@@ -30165,7 +30162,10 @@ void main() {
         controller.stats.source = controller.glbPath;
       }
       controller.stats.bytes = buffer.byteLength;
-      const gltf = await new Promise((resolve, reject) => gltfLoader.parse(buffer, "", resolve, reject));
+      const loader = new GLTFLoader();
+      loader.setDRACOLoader(dracoLoader);
+      loader.setMeshoptDecoder(MeshoptDecoder);
+      const gltf = await new Promise((resolve, reject) => loader.parse(buffer, "", resolve, reject));
       controller.model.add(gltf.scene);
       applyModelEffect(controller);
       controller.loaded = true;

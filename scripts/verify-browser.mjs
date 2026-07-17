@@ -153,7 +153,7 @@ try {
   if (defaultResult.ikMode !== "active5_dls") {
     throw new Error(`Default IK mode must be Active-5 3D DLS for imported path simulation: ${JSON.stringify(defaultResult, null, 2)}`);
   }
-  if (defaultResult.scriptVersion !== "20260717-draco-v16") {
+  if (defaultResult.scriptVersion !== "20260717-draco-v17") {
     throw new Error(`Script version must cache-bust the Draco GLB update: ${JSON.stringify(defaultResult, null, 2)}`);
   }
   const glbAnchorMiss = defaultResult.glbAnchorErrors.find((item) => item.error > 0.001);
