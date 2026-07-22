@@ -397,15 +397,6 @@ input[type="checkbox"] {
   background: #fff;
 }
 
-.linear-file-button input {
-  position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
-  opacity: 0;
-  cursor: pointer;
-}
-
 .linear-path-status {
   min-height: 18px;
   color: var(--muted);

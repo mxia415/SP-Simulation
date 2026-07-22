@@ -1,10 +1,5 @@
 (() => {
   // ../../../Users/ming/Documents/Codex/2026-06-26/SP-S/work/node_modules/three/build/three.module.js
-  /**
-   * @license
-   * Copyright 2010-2024 Three.js Authors
-   * SPDX-License-Identifier: MIT
-   */
   var REVISION = "165";
   var MOUSE = { LEFT: 0, MIDDLE: 1, RIGHT: 2, ROTATE: 0, DOLLY: 1, PAN: 2 };
   var TOUCH = { ROTATE: 0, PAN: 1, DOLLY_PAN: 2, DOLLY_ROTATE: 3 };
@@ -27712,7 +27707,7 @@ void main() {
   }
 
   // outputs/html-version/app.mjs
-  var SCRIPT_VERSION = "20260717-draco-v17";
+  var SCRIPT_VERSION = "20260722-demo-path-v18";
   var RENDER_SCALE = 1 / 1e3;
   var QT_STAGE_MODE = new URLSearchParams(window.location.search).has("qtStage");
   if (QT_STAGE_MODE) document.documentElement.dataset.qtStage = "true";
@@ -29257,11 +29252,8 @@ void main() {
     </div>
     <div class="linear-import-panel">
       <div class="linear-import-head">
-        <strong>\u8DEF\u5F84\u5BFC\u5165</strong>
-        <label class="linear-file-button">
-          <span>CSV / JSON</span>
-          <input id="linearPathFile" type="file" accept=".csv,.json,text/csv,application/json" />
-        </label>
+        <strong>\u8DEF\u5F84\u6F14\u793A</strong>
+        <button id="loadDemoPath" class="linear-file-button" type="button">\u6F14\u793A\u8DEF\u5F84</button>
       </div>
       <p class="coordinate-note">${COORDINATE_SYSTEM_NOTE}</p>
       <div class="linear-grid">
@@ -29283,7 +29275,7 @@ void main() {
       <button id="setLinearStart" type="button">\u5F53\u524D\u8BBE\u4E3A\u8D77\u70B9</button>
       <button id="setLinearEnd" type="button">\u5F53\u524D\u8BBE\u4E3A\u7EC8\u70B9</button>
       <button id="returnLinearStart" type="button">\u56DE\u5230\u8D77\u70B9</button>
-      <button id="clearLinearPath" type="button">\u6E05\u9664\u5BFC\u5165\u8DEF\u5F84</button>
+      <button id="clearLinearPath" type="button">\u6E05\u9664\u6F14\u793A\u8DEF\u5F84</button>
       <button id="simulateLinearMotion" type="button">\u6A21\u62DF</button>
     </div>
   `;
@@ -29317,7 +29309,7 @@ void main() {
       resetLinearIkHistory();
       runLinearMotion({ resetToStartState: importedLinearPathActive() });
     });
-    document.querySelector("#linearPathFile").addEventListener("change", onLinearPathFileSelected);
+    document.querySelector("#loadDemoPath").addEventListener("click", loadDefaultImportedLinearPath);
     document.querySelector("#linearProgress").addEventListener("input", (event) => setLinearProgress(event.target.value));
     document.querySelector("#linearProgressNumber").addEventListener("change", (event) => setLinearProgress(event.target.value));
     document.querySelector("#setLinearStart").addEventListener("click", () => setLinearPoint("startWorld", currentTipWorld()));
@@ -29473,12 +29465,6 @@ void main() {
     }
     return roundedWorldPoint(normalized);
   }
-  function parseJsonPathPoints(text) {
-    const payload = JSON.parse(text);
-    const rows = Array.isArray(payload) ? payload : payload.points ?? payload.path ?? payload.positions;
-    if (!Array.isArray(rows)) throw new Error("JSON \u9700\u8981\u662F\u70B9\u6570\u7EC4\uFF0C\u6216\u5305\u542B points/path/positions \u6570\u7EC4");
-    return rows.map((row, index) => normalizePathPoint(row, index));
-  }
   function splitCsvLine(line) {
     return line.trim().split(/[,\t; ]+/).map((cell) => cell.trim()).filter(Boolean);
   }
@@ -29518,25 +29504,6 @@ void main() {
     syncLinearPointInputs("startWorld");
     syncLinearPointInputs("endWorld");
     runLinearMotion({ resetToStartState: true });
-  }
-  function parseLinearPathFile(file, text) {
-    const name = file?.name || "";
-    if (/\.json$/i.test(name) || /^\s*[\[{]/.test(text)) return parseJsonPathPoints(text);
-    return parseCsvPathPoints(text);
-  }
-  async function onLinearPathFileSelected(event) {
-    const file = event.target.files?.[0];
-    if (!file) return;
-    try {
-      const text = await file.text();
-      applyImportedLinearPath(parseLinearPathFile(file, text), file.name);
-    } catch (error) {
-      stopLinearSimulation();
-      linearMotion.pathStatus = `\u5BFC\u5165\u5931\u8D25\uFF1A${error?.message || error}`;
-      syncLinearReadouts();
-    } finally {
-      event.target.value = "";
-    }
   }
   async function loadDefaultImportedLinearPath() {
     setDriveMode("linear");
@@ -30676,3 +30643,12 @@ void main() {
   loadDefaultImportedLinearPath();
   animate();
 })();
+/*! Bundled license information:
+
+three/build/three.module.js:
+  (**
+   * @license
+   * Copyright 2010-2024 Three.js Authors
+   * SPDX-License-Identifier: MIT
+   *)
+*/

@@ -32,7 +32,7 @@ import {
   sceneToDevicePointData,
 } from "./coordinates.mjs";
 
-const SCRIPT_VERSION = "20260717-draco-v17";
+const SCRIPT_VERSION = "20260722-demo-path-v18";
 const RENDER_SCALE = 1 / 1000;
 const QT_STAGE_MODE = new URLSearchParams(window.location.search).has("qtStage");
 if (QT_STAGE_MODE) document.documentElement.dataset.qtStage = "true";
@@ -1707,11 +1707,8 @@ function createLinearControls() {
     </div>
     <div class="linear-import-panel">
       <div class="linear-import-head">
-        <strong>路径导入</strong>
-        <label class="linear-file-button">
-          <span>CSV / JSON</span>
-          <input id="linearPathFile" type="file" accept=".csv,.json,text/csv,application/json" />
-        </label>
+        <strong>路径演示</strong>
+        <button id="loadDemoPath" class="linear-file-button" type="button">演示路径</button>
       </div>
       <p class="coordinate-note">${COORDINATE_SYSTEM_NOTE}</p>
       <div class="linear-grid">
@@ -1733,7 +1730,7 @@ function createLinearControls() {
       <button id="setLinearStart" type="button">当前设为起点</button>
       <button id="setLinearEnd" type="button">当前设为终点</button>
       <button id="returnLinearStart" type="button">回到起点</button>
-      <button id="clearLinearPath" type="button">清除导入路径</button>
+      <button id="clearLinearPath" type="button">清除演示路径</button>
       <button id="simulateLinearMotion" type="button">模拟</button>
     </div>
   `;
@@ -1770,7 +1767,7 @@ function createLinearControls() {
     resetLinearIkHistory();
     runLinearMotion({ resetToStartState: importedLinearPathActive() });
   });
-  document.querySelector("#linearPathFile").addEventListener("change", onLinearPathFileSelected);
+  document.querySelector("#loadDemoPath").addEventListener("click", loadDefaultImportedLinearPath);
   document.querySelector("#linearProgress").addEventListener("input", (event) => setLinearProgress(event.target.value));
   document.querySelector("#linearProgressNumber").addEventListener("change", (event) => setLinearProgress(event.target.value));
   document.querySelector("#setLinearStart").addEventListener("click", () => setLinearPoint("startWorld", currentTipWorld()));

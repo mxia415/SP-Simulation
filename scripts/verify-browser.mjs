@@ -92,6 +92,9 @@ try {
     driveLinearVisible: document.querySelector("#linearPanel") ? !document.querySelector("#linearPanel").hidden : true,
     pointCount: document.querySelector("#linearPathPointCount")?.value,
     status: document.querySelector("#linearPathStatus")?.value,
+    demoPanelTitle: document.querySelector(".linear-import-head strong")?.textContent?.trim(),
+    demoButtonText: document.querySelector("#loadDemoPath")?.textContent?.trim(),
+    legacyFileInputExists: Boolean(document.querySelector("#linearPathFile")),
     ikMode: document.querySelector("#linearIkMode")?.value,
     ikModeOptions: Array.from(document.querySelectorAll("#linearIkMode option")).map((option) => ({
       value: option.value,
@@ -153,8 +156,8 @@ try {
   if (defaultResult.ikMode !== "active5_dls") {
     throw new Error(`Default IK mode must be Active-5 3D DLS for imported path simulation: ${JSON.stringify(defaultResult, null, 2)}`);
   }
-  if (defaultResult.scriptVersion !== "20260717-draco-v17") {
-    throw new Error(`Script version must cache-bust the Draco GLB update: ${JSON.stringify(defaultResult, null, 2)}`);
+  if (defaultResult.scriptVersion !== "20260722-demo-path-v18") {
+    throw new Error(`Script version must cache-bust the demo path update: ${JSON.stringify(defaultResult, null, 2)}`);
   }
   const glbAnchorMiss = defaultResult.glbAnchorErrors.find((item) => item.error > 0.001);
   if (glbAnchorMiss) {
@@ -180,6 +183,13 @@ try {
   }
   if (defaultResult.pathRender?.pointMarkers !== 0) {
     throw new Error(`Default imported cuboid path must not show point markers: ${JSON.stringify(defaultResult, null, 2)}`);
+  }
+  if (
+    defaultResult.demoPanelTitle !== "路径演示" ||
+    defaultResult.demoButtonText !== "演示路径" ||
+    defaultResult.legacyFileInputExists
+  ) {
+    throw new Error(`Linear path panel must expose demo path controls without CSV/JSON upload: ${JSON.stringify(defaultResult, null, 2)}`);
   }
   if (
     defaultResult.toolRange?.sliderMin !== "-55" ||
@@ -260,19 +270,12 @@ try {
   }
   await page.click('[data-theme-choice="dark"]');
 
-  const csv = [
-    "x,y,z",
-    "3600,-800,1200",
-    "3800,-700,1260",
-    "4100,-500,1320",
-  ].join("\n");
-
-  await page.locator("#linearPathFile").setInputFiles({
-    name: "path.csv",
-    mimeType: "text/csv",
-    buffer: Buffer.from(csv),
+  await page.click("#clearLinearPath");
+  await page.waitForFunction(() => !window.__lingzhuDebug?.importedLinearPath?.active, null, {
+    timeout: 10000,
   });
-  await page.waitForFunction(() => window.__lingzhuDebug?.importedLinearPath?.pointCount === 4, null, {
+  await page.click("#loadDemoPath");
+  await page.waitForFunction(() => window.__lingzhuDebug?.importedLinearPath?.pointCount === 127, null, {
     timeout: 10000,
   });
   await page.selectOption("#linearPathMode", "points");
@@ -302,13 +305,13 @@ try {
   if (errors.length || result.bootErrors?.length) {
     throw new Error(JSON.stringify({ errors, result }, null, 2));
   }
-  if (result.pointCount !== "4" || result.mode !== "points" || !result.debug?.active) {
-    throw new Error(`Path import verification failed: ${JSON.stringify(result, null, 2)}`);
+  if (result.pointCount !== "127" || result.mode !== "points" || !result.debug?.active) {
+    throw new Error(`Demo path verification failed: ${JSON.stringify(result, null, 2)}`);
   }
   if (result.ikMode !== "active5_dls" || result.linearMotion?.ikMode !== "active5_dls") {
     throw new Error(`Active-5 3D DLS IK mode must be reflected in debug state by default: ${JSON.stringify(result, null, 2)}`);
   }
-  const firstImportedPoint = { x: 3600, y: -800, z: 1200 };
+  const firstImportedPoint = { x: 3600, y: -2000, z: 0 };
   const simulationPath = result.linearMotion?.pathPoints || [];
   const pathStartsAtImportedPoint = ["x", "y", "z"].every(
     (axis) => Math.abs(Number(simulationPath[0]?.[axis]) - firstImportedPoint[axis]) < 0.01,
@@ -316,8 +319,8 @@ try {
   const secondPointIsImportedStart = ["x", "y", "z"].every(
     (axis) => Math.abs(Number(simulationPath[1]?.[axis]) - firstImportedPoint[axis]) < 0.01,
   );
-  if (simulationPath.length !== 4 || pathStartsAtImportedPoint || !secondPointIsImportedStart) {
-    throw new Error(`Imported path must be prefixed by the fixed vertical-pose point: ${JSON.stringify(result, null, 2)}`);
+  if (simulationPath.length !== 127 || pathStartsAtImportedPoint || !secondPointIsImportedStart) {
+    throw new Error(`Demo path must be prefixed by the fixed start pose point: ${JSON.stringify(result, null, 2)}`);
   }
   const importedPathStartState = result.linearMotion?.startState || {};
   const startsFromInitialPrintPose =
@@ -339,10 +342,10 @@ try {
     throw new Error(`Imported path must render walked solid and remaining dashed segments: ${JSON.stringify(result, null, 2)}`);
   }
   if (result.pathRender?.pointMarkers !== 0) {
-    throw new Error(`Imported CSV path must not show point markers: ${JSON.stringify(result, null, 2)}`);
+    throw new Error(`Demo path must not show point markers: ${JSON.stringify(result, null, 2)}`);
   }
   if (result.pathRender?.lineRenderer !== "fat-line" || result.pathRender?.lineWidthPx < 4) {
-    throw new Error(`Imported CSV path must use thick fat-line rendering: ${JSON.stringify(result, null, 2)}`);
+    throw new Error(`Demo path must use thick fat-line rendering: ${JSON.stringify(result, null, 2)}`);
   }
   if (result.pathRender?.remainingLineWidthPx >= result.pathRender?.lineWidthPx) {
     throw new Error(`Unwalked dashed path must be thinner than walked path: ${JSON.stringify(result, null, 2)}`);
@@ -367,7 +370,7 @@ try {
     return Math.abs(Number(result.linearMotion?.previousIkDelta?.[key] || 0)) <= limit + 0.001;
   });
   if (poseStillVertical || !Number.isFinite(solveError) || !active5WithinStartupLimits) {
-    throw new Error(`Imported CSV progress must solve a non-vertical rate-limited Active-5 IK pose: ${JSON.stringify(result, null, 2)}`);
+    throw new Error(`Demo path progress must solve a non-vertical rate-limited Active-5 IK pose: ${JSON.stringify(result, null, 2)}`);
   }
   if (!result.coordinateSystem?.includes("3D视角 X/Y/Z") || !result.coordinateNote?.includes("Z为高度")) {
     throw new Error(`Coordinate note verification failed: ${JSON.stringify(result, null, 2)}`);
