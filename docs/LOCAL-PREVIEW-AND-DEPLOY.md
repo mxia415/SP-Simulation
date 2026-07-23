@@ -1,6 +1,6 @@
 # Local Preview And Deployment
 
-Last synchronized on 2026-07-17.
+Last synchronized on 2026-07-23.
 
 ## Clean Worktrees
 
@@ -82,6 +82,8 @@ node --check outputs/html-version/model.mjs
 node --check outputs/html-version/app.mjs
 node --check scripts/verify-actuator-constraints.mjs
 node --check scripts/verify-browser.mjs
+node --check scripts/verify-formal-phi-ik.mjs
+node scripts/verify-formal-phi-ik.mjs
 npm run verify:actuators
 npm run verify:browser
 npm run build
@@ -97,7 +99,8 @@ npm run verify:path
 Browser verification currently checks:
 
 - default path import
-- Active-5 default IK selection
+- formal analytic phi default IK selection
+- exactly three normal IK dropdown options: `局部贪心解析 φ`, `平衡姿态解析 φ`, `强姿态解析 φ`
 - theme switching
 - printhead and arm angle ranges
 - initial print pose preset
@@ -105,6 +108,8 @@ Browser verification currently checks:
 - return-to-start behavior
 - high-speed simulation startup behavior
 - GLB follow anchor error for followed models
+
+Formal IK verification (`scripts/verify-formal-phi-ik.mjs`) checks the three formal analytic phi modes on calibration, demo-path, and boundary-near targets. It reports maximum TCP residual and maximum single-step joint change. The current expected residual is below `1 mm`.
 
 When debugging local GLB loading separately, verify all model controllers load:
 
@@ -131,3 +136,8 @@ After push, Cloudflare should clone the latest Git commit. If it reports `Upload
 - whether `scripts/build-cloudflare-pages.mjs` copies the changed files into `dist/`
 
 The current Cloudflare build script copies `outputs/html-version/` and root redirect output into `dist/`.
+
+Current control-page metadata:
+
+- Visible version: `V1.9 · 2026-07-23`
+- Script/cache token: `20260723-base-meshopt`

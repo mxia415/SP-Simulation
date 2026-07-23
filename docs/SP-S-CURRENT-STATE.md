@@ -1,6 +1,6 @@
 # SP-S Current State
 
-Last synchronized from the Codex control thread on 2026-07-17.
+Last synchronized from the Codex control thread on 2026-07-23.
 
 ## Coordinate Contract
 
@@ -55,7 +55,9 @@ ACTUATOR_LIMITS = {
 };
 ```
 
-Default calibration pose remains an unclamped GLB/linkage reference. The user-facing startup print pose is:
+Default calibration pose remains an unclamped GLB/linkage reference. This is intentional: GLB and linkage coordinates were calibrated with arm1 at `90°`, even though the current arm1 motion limit clamps runtime motion to `83.8189°`. Do not recompute GLB anchors from a clamped default pose.
+
+The user-facing startup print pose is:
 
 ```js
 initialPrint = { arm1: 81, arm2: 72, arm3: 49, offset: 50, base: 4 };
@@ -120,44 +122,32 @@ Simulation must move from the fixed initial print pose to the imported path star
 
 ## IK Modes
 
-The HTML selector exposes five modes:
+The ordinary HTML selector exposes exactly three formal analytic phi modes:
 
-- `Original`
-- `Balanced`
-- `Improved`
-- `Phi Scan`
-- `Active-5 3D DLS`
+- `greedy_continuity` / `局部贪心解析 φ`
+- `balanced_posture` / `平衡姿态解析 φ`
+- `posture_priority` / `强姿态解析 φ`
 
-Default imported-path mode is `Active-5 3D DLS`.
+Default imported-path mode is `posture_priority` / `强姿态解析 φ`.
 
-Active-5 controls:
+The older `Original`, `Balanced`, `Improved`, `Phi Scan`, and `Active-5 3D DLS` implementations may remain internally for experiments, but they must not be shown in the normal path-simulation IK dropdown unless the user explicitly asks for an experimental/debug UI.
 
-```js
-q = [base, arm1, arm2, arm3, printhead]
-```
+Formal analytic phi solver contract:
 
-Constraints:
+- Use target `X/Y/Z` in the 3D viewport coordinate convention.
+- Adapt 3D to the formal planar solver by solving base/yaw from target `XY`, then solving local `X/Z` with analytic phi.
+- Candidate TCP must exactly hit the target before posture scoring; do not trade tracking error for posture.
+- Candidate filtering must enforce joint hard limits, strict actuator stroke, correct linkage branch, and vertical tool angle.
+- The printhead/tool target angle is `-90°`.
+- Each mode maintains previous and previous-previous accepted states for continuity; reset this history when switching algorithms, clearing/reloading paths, returning to start, or restarting simulation.
+- Speed/time playback in the control page is a display simulation. It is not the full offline dynamics trajectory time parameterization.
 
-- base moves for XY rotation.
-- arm1/arm2/arm3 move for radius and height.
-- printhead moves to keep the tool vertical.
-- target tool angle is `-90 deg`.
-- per-frame velocity and acceleration limits are part of the solver contract.
-
-Current Active-5 parameters:
+Formal scoring weights:
 
 ```js
-Kp: 0.8
-maxCartStepMm: 80
-damping: 0.08
-WDiag: { base: 1.1, arm1: 1, arm2: 1, arm3: 1, offset: 0.8 }
-mu: 0
-gamma: 0
-qRefDeg: { base: 0, arm1: 90, arm2: 90, arm3: 100, offset: 0 }
-dqLimitDeg: { base: 2, arm1: 6, arm2: 6, arm3: 6, offset: 2 }
-ddqLimitDeg: { base: 1, arm1: 2, arm2: 2, arm3: 2, offset: 1 }
-toolAngleWeightMm: 500
-maxOrientationStepDeg: 5
+greedy_continuity: { movement: 1.0, smoothness: 0.35, posture: 0 }
+balanced_posture: { movement: 1.0, smoothness: 1.15, posture: 0.003 }
+posture_priority: { movement: 0.8, smoothness: 2.5, posture: 0.012 }
 ```
 
 ## GLB Follow Contract
@@ -165,6 +155,8 @@ maxOrientationStepDeg: 5
 - GLB files themselves are not moved to satisfy a math update.
 - Ball-stick coordinates are the source of truth.
 - Runtime GLB pose follows ball-stick target points through reference-pose anchors.
+- GLB binding reference pose must be generated from `CALIBRATION_STATE` with limit clamping disabled (`computePose(CALIBRATION_STATE, { clampLimits: false })` in the current code). Arm1 must remain `90°` in this reference.
+- The deployable base model is Meshopt-compressed for Cloudflare loading speed. When replacing it, regenerate `outputs/html-version/assets/base-model.js` from the exact deployable GLB bytes for `file://` fallback.
 - If ball-stick coordinates change but GLB files do not, recompute/follow against the new ball-stick points; do not hand-tune model positions.
 - Verify `modelAnchorWorld` matches `targetAnchorWorld` for every followed GLB within `0.001 mm`.
 - A local worktree without `git-lfs` may contain 130 byte `.glb` pointer files; that causes all GLBs to show as not loaded even when code is correct.
@@ -177,3 +169,8 @@ maxOrientationStepDeg: 5
 - The page loads `app-bundle.js`; after source edits, rebuild the bundle.
 - Cache-bust `styles.css`, `app-bundle.js`, and script/model URLs by updating `SCRIPT_VERSION`.
 - Root `outputs/index.html` redirects to `outputs/html-version/index.html` with the same version token.
+
+Current visible metadata:
+
+- Page version: `V1.9 · 2026-07-23`
+- Script/cache token: `20260723-base-meshopt`

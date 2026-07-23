@@ -156,7 +156,7 @@ try {
   if (defaultResult.ikMode !== "posture_priority") {
     throw new Error(`Default IK mode must be 强姿态解析 φ for imported path simulation: ${JSON.stringify(defaultResult, null, 2)}`);
   }
-  if (defaultResult.scriptVersion !== "20260723-glb-calibration-pose") {
+  if (defaultResult.scriptVersion !== "20260723-base-meshopt") {
     throw new Error(`Script version must cache-bust the GLB calibration pose update: ${JSON.stringify(defaultResult, null, 2)}`);
   }
   const glbAnchorMiss = defaultResult.glbAnchorErrors.find((item) => item.error > 0.001);

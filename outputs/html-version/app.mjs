@@ -35,7 +35,7 @@ import {
   sceneToDevicePointData,
 } from "./coordinates.mjs";
 
-const SCRIPT_VERSION = "20260723-glb-calibration-pose";
+const SCRIPT_VERSION = "20260723-base-meshopt";
 const RENDER_SCALE = 1 / 1000;
 const QT_STAGE_MODE = new URLSearchParams(window.location.search).has("qtStage");
 if (QT_STAGE_MODE) document.documentElement.dataset.qtStage = "true";
