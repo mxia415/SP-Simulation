@@ -1,5 +1,5 @@
 (() => {
-  // ../../../Users/ming/Documents/Codex/2026-06-26/SP-S/work/node_modules/three/build/three.module.js
+  // work/node_modules/three/build/three.module.js
   var REVISION = "165";
   var MOUSE = { LEFT: 0, MIDDLE: 1, RIGHT: 2, ROTATE: 0, DOLLY: 1, PAN: 2 };
   var TOUCH = { ROTATE: 0, PAN: 1, DOLLY_PAN: 2, DOLLY_ROTATE: 3 };
@@ -21994,7 +21994,7 @@ void main() {
     }
   }
 
-  // ../../../Users/ming/Documents/Codex/2026-06-26/SP-S/work/node_modules/three/examples/jsm/controls/OrbitControls.js
+  // work/node_modules/three/examples/jsm/controls/OrbitControls.js
   var _changeEvent = { type: "change" };
   var _startEvent = { type: "start" };
   var _endEvent = { type: "end" };
@@ -22768,7 +22768,7 @@ void main() {
     }
   };
 
-  // ../../../Users/ming/Documents/Codex/2026-06-26/SP-S/work/node_modules/three/examples/jsm/loaders/DRACOLoader.js
+  // work/node_modules/three/examples/jsm/loaders/DRACOLoader.js
   var _taskCache = /* @__PURE__ */ new WeakMap();
   var DRACOLoader = class extends Loader {
     constructor(manager) {
@@ -23107,7 +23107,7 @@ void main() {
     }
   }
 
-  // ../../../Users/ming/Documents/Codex/2026-06-26/SP-S/work/node_modules/three/examples/jsm/utils/BufferGeometryUtils.js
+  // work/node_modules/three/examples/jsm/utils/BufferGeometryUtils.js
   function toTrianglesDrawMode(geometry, drawMode) {
     if (drawMode === TrianglesDrawMode) {
       console.warn("THREE.BufferGeometryUtils.toTrianglesDrawMode(): Geometry already defined as triangles.");
@@ -23163,7 +23163,7 @@ void main() {
     }
   }
 
-  // ../../../Users/ming/Documents/Codex/2026-06-26/SP-S/work/node_modules/three/examples/jsm/loaders/GLTFLoader.js
+  // work/node_modules/three/examples/jsm/loaders/GLTFLoader.js
   var GLTFLoader = class extends Loader {
     constructor(manager) {
       super(manager);
@@ -25644,7 +25644,7 @@ void main() {
     });
   }
 
-  // ../../../Users/ming/Documents/Codex/2026-06-26/SP-S/work/node_modules/three/examples/jsm/libs/meshopt_decoder.module.js
+  // work/node_modules/three/examples/jsm/libs/meshopt_decoder.module.js
   var MeshoptDecoder = (function() {
     "use strict";
     var wasm_base = "b9H79Tebbbe8Fv9Gbb9Gvuuuuueu9Giuuub9Geueu9Giuuueuikqbeeedddillviebeoweuec:q;iekr;leDo9TW9T9VV95dbH9F9F939H79T9F9J9H229F9Jt9VV7bb8A9TW79O9V9Wt9F9KW9J9V9KW9wWVtW949c919M9MWVbeY9TW79O9V9Wt9F9KW9J9V9KW69U9KW949c919M9MWVbdE9TW79O9V9Wt9F9KW9J9V9KW69U9KW949tWG91W9U9JWbiL9TW79O9V9Wt9F9KW9J9V9KWS9P2tWV9p9JtblK9TW79O9V9Wt9F9KW9J9V9KWS9P2tWV9r919HtbvL9TW79O9V9Wt9F9KW9J9V9KWS9P2tWVT949Wbol79IV9Rbrq:P8Yqdbk;3sezu8Jjjjjbcj;eb9Rgv8Kjjjjbc9:hodnadcefal0mbcuhoaiRbbc:Ge9hmbavaialfgrad9Radz1jjjbhwcj;abad9UhoaicefhldnadTmbaoc;WFbGgocjdaocjd6EhDcbhqinaqae9pmeaDaeaq9RaqaDfae6Egkcsfgocl4cifcd4hxdndndndnaoc9WGgmTmbcbhPcehsawcjdfhzalhHinaraH9Rax6midnaraHaxfgl9RcK6mbczhoinawcj;cbfaogifgoc9WfhOdndndndndnaHaic9WfgAco4fRbbaAci4coG4ciGPlbedibkaO9cb83ibaOcwf9cb83ibxikaOalRblalRbbgAco4gCaCciSgCE86bbaocGfalclfaCfgORbbaAcl4ciGgCaCciSgCE86bbaocVfaOaCfgORbbaAcd4ciGgCaCciSgCE86bbaoc7faOaCfgORbbaAciGgAaAciSgAE86bbaoctfaOaAfgARbbalRbegOco4gCaCciSgCE86bbaoc91faAaCfgARbbaOcl4ciGgCaCciSgCE86bbaoc4faAaCfgARbbaOcd4ciGgCaCciSgCE86bbaoc93faAaCfgARbbaOciGgOaOciSgOE86bbaoc94faAaOfgARbbalRbdgOco4gCaCciSgCE86bbaoc95faAaCfgARbbaOcl4ciGgCaCciSgCE86bbaoc96faAaCfgARbbaOcd4ciGgCaCciSgCE86bbaoc97faAaCfgARbbaOciGgOaOciSgOE86bbaoc98faAaOfgORbbalRbiglco4gAaAciSgAE86bbaoc99faOaAfgORbbalcl4ciGgAaAciSgAE86bbaoc9:faOaAfgORbbalcd4ciGgAaAciSgAE86bbaocufaOaAfgoRbbalciGglalciSglE86bbaoalfhlxdkaOalRbwalRbbgAcl4gCaCcsSgCE86bbaocGfalcwfaCfgORbbaAcsGgAaAcsSgAE86bbaocVfaOaAfgORbbalRbegAcl4gCaCcsSgCE86bbaoc7faOaCfgORbbaAcsGgAaAcsSgAE86bbaoctfaOaAfgORbbalRbdgAcl4gCaCcsSgCE86bbaoc91faOaCfgORbbaAcsGgAaAcsSgAE86bbaoc4faOaAfgORbbalRbigAcl4gCaCcsSgCE86bbaoc93faOaCfgORbbaAcsGgAaAcsSgAE86bbaoc94faOaAfgORbbalRblgAcl4gCaCcsSgCE86bbaoc95faOaCfgORbbaAcsGgAaAcsSgAE86bbaoc96faOaAfgORbbalRbvgAcl4gCaCcsSgCE86bbaoc97faOaCfgORbbaAcsGgAaAcsSgAE86bbaoc98faOaAfgORbbalRbogAcl4gCaCcsSgCE86bbaoc99faOaCfgORbbaAcsGgAaAcsSgAE86bbaoc9:faOaAfgORbbalRbrglcl4gAaAcsSgAE86bbaocufaOaAfgoRbbalcsGglalcsSglE86bbaoalfhlxekaOal8Pbb83bbaOcwfalcwf8Pbb83bbalczfhlkdnaiam9pmbaiczfhoaral9RcL0mekkaiam6mialTmidnakTmbawaPfRbbhOcbhoazhiinaiawcj;cbfaofRbbgAce4cbaAceG9R7aOfgO86bbaiadfhiaocefgoak9hmbkkazcefhzaPcefgPad6hsalhHaPad9hmexvkkcbhlasceGmdxikalaxad2fhCdnakTmbcbhHcehsawcjdfhminaral9Rax6mialTmdalaxfhlawaHfRbbhOcbhoamhiinaiawcj;cbfaofRbbgAce4cbaAceG9R7aOfgO86bbaiadfhiaocefgoak9hmbkamcefhmaHcefgHad6hsaHad9hmbkaChlxikcbhocehsinaral9Rax6mdalTmealaxfhlaocefgoad6hsadao9hmbkaChlxdkcbhlasceGTmekc9:hoxikabaqad2fawcjdfakad2z1jjjb8Aawawcjdfakcufad2fadz1jjjb8Aakaqfhqalmbkc9:hoxekcbc99aral9Radcaadca0ESEhokavcj;ebf8Kjjjjbaok;yzeHu8Jjjjjbc;ae9Rgv8Kjjjjbc9:hodnaeci9UgrcHfal0mbcuhoaiRbbgwc;WeGc;Ge9hmbawcsGgDce0mbavc;abfcFecjez:jjjjb8AavcUf9cu83ibavc8Wf9cu83ibavcyf9cu83ibavcaf9cu83ibavcKf9cu83ibavczf9cu83ibav9cu83iwav9cu83ibaialfc9WfhqaicefgwarfhodnaeTmbcmcsaDceSEhkcbhxcbhmcbhDcbhicbhlindnaoaq9nmbc9:hoxikdndnawRbbgrc;Ve0mbavc;abfalarcl4cu7fcsGcitfgPydlhsaPydbhzdnarcsGgPak9pmbavaiarcu7fcsGcdtfydbaxaPEhraPThPdndnadcd9hmbabaDcetfgHaz87ebaHcdfas87ebaHclfar87ebxekabaDcdtfgHazBdbaHclfasBdbaHcwfarBdbkaxaPfhxavc;abfalcitfgHarBdbaHasBdlavaicdtfarBdbavc;abfalcefcsGglcitfgHazBdbaHarBdlaiaPfhialcefhlxdkdndnaPcsSmbamaPfaPc987fcefhmxekaocefhrao8SbbgPcFeGhHdndnaPcu9mmbarhoxekaocvfhoaHcFbGhHcrhPdninar8SbbgOcFbGaPtaHVhHaOcu9kmearcefhraPcrfgPc8J9hmbxdkkarcefhokaHce4cbaHceG9R7amfhmkdndnadcd9hmbabaDcetfgraz87ebarcdfas87ebarclfam87ebxekabaDcdtfgrazBdbarclfasBdbarcwfamBdbkavc;abfalcitfgramBdbarasBdlavaicdtfamBdbavc;abfalcefcsGglcitfgrazBdbaramBdlaicefhialcefhlxekdnarcpe0mbaxcefgOavaiaqarcsGfRbbgPcl49RcsGcdtfydbaPcz6gHEhravaiaP9RcsGcdtfydbaOaHfgsaPcsGgOEhPaOThOdndnadcd9hmbabaDcetfgzax87ebazcdfar87ebazclfaP87ebxekabaDcdtfgzaxBdbazclfarBdbazcwfaPBdbkavaicdtfaxBdbavc;abfalcitfgzarBdbazaxBdlavaicefgicsGcdtfarBdbavc;abfalcefcsGcitfgzaPBdbazarBdlavaiaHfcsGgicdtfaPBdbavc;abfalcdfcsGglcitfgraxBdbaraPBdlalcefhlaiaOfhiasaOfhxxekaxcbaoRbbgzEgAarc;:eSgrfhsazcsGhCazcl4hXdndnazcs0mbascefhOxekashOavaiaX9RcsGcdtfydbhskdndnaCmbaOcefhxxekaOhxavaiaz9RcsGcdtfydbhOkdndnarTmbaocefhrxekaocdfhrao8SbegHcFeGhPdnaHcu9kmbaocofhAaPcFbGhPcrhodninar8SbbgHcFbGaotaPVhPaHcu9kmearcefhraocrfgoc8J9hmbkaAhrxekarcefhrkaPce4cbaPceG9R7amfgmhAkdndnaXcsSmbarhPxekarcefhPar8SbbgocFeGhHdnaocu9kmbarcvfhsaHcFbGhHcrhodninaP8SbbgrcFbGaotaHVhHarcu9kmeaPcefhPaocrfgoc8J9hmbkashPxekaPcefhPkaHce4cbaHceG9R7amfgmhskdndnaCcsSmbaPhoxekaPcefhoaP8SbbgrcFeGhHdnarcu9kmbaPcvfhOaHcFbGhHcrhrdninao8SbbgPcFbGartaHVhHaPcu9kmeaocefhoarcrfgrc8J9hmbkaOhoxekaocefhokaHce4cbaHceG9R7amfgmhOkdndnadcd9hmbabaDcetfgraA87ebarcdfas87ebarclfaO87ebxekabaDcdtfgraABdbarclfasBdbarcwfaOBdbkavc;abfalcitfgrasBdbaraABdlavaicdtfaABdbavc;abfalcefcsGcitfgraOBdbarasBdlavaicefgicsGcdtfasBdbavc;abfalcdfcsGcitfgraABdbaraOBdlavaiazcz6aXcsSVfgicsGcdtfaOBdbaiaCTaCcsSVfhialcifhlkawcefhwalcsGhlaicsGhiaDcifgDae6mbkkcbc99aoaqSEhokavc;aef8Kjjjjbaok:llevu8Jjjjjbcz9Rhvc9:hodnaecvfal0mbcuhoaiRbbc;:eGc;qe9hmbav9cb83iwaicefhraialfc98fhwdnaeTmbdnadcdSmbcbhDindnaraw6mbc9:skarcefhoar8SbbglcFeGhidndnalcu9mmbaohrxekarcvfhraicFbGhicrhldninao8SbbgdcFbGaltaiVhiadcu9kmeaocefhoalcrfglc8J9hmbxdkkaocefhrkabaDcdtfaicd4cbaice4ceG9R7avcwfaiceGcdtVgoydbfglBdbaoalBdbaDcefgDae9hmbxdkkcbhDindnaraw6mbc9:skarcefhoar8SbbglcFeGhidndnalcu9mmbaohrxekarcvfhraicFbGhicrhldninao8SbbgdcFbGaltaiVhiadcu9kmeaocefhoalcrfglc8J9hmbxdkkaocefhrkabaDcetfaicd4cbaice4ceG9R7avcwfaiceGcdtVgoydbfgl87ebaoalBdbaDcefgDae9hmbkkcbc99arawSEhokaok:Lvoeue99dud99eud99dndnadcl9hmbaeTmeindndnabcdfgd8Sbb:Yab8Sbbgi:Ygl:l:tabcefgv8Sbbgo:Ygr:l:tgwJbb;:9cawawNJbbbbawawJbbbb9GgDEgq:mgkaqaicb9iEalMgwawNakaqaocb9iEarMgqaqNMM:r:vglNJbbbZJbbb:;aDEMgr:lJbbb9p9DTmbar:Ohixekcjjjj94hikadai86bbdndnaqalNJbbbZJbbb:;aqJbbbb9GEMgq:lJbbb9p9DTmbaq:Ohdxekcjjjj94hdkavad86bbdndnawalNJbbbZJbbb:;awJbbbb9GEMgw:lJbbb9p9DTmbaw:Ohdxekcjjjj94hdkabad86bbabclfhbaecufgembxdkkaeTmbindndnabclfgd8Ueb:Yab8Uebgi:Ygl:l:tabcdfgv8Uebgo:Ygr:l:tgwJb;:FSawawNJbbbbawawJbbbb9GgDEgq:mgkaqaicb9iEalMgwawNakaqaocb9iEarMgqaqNMM:r:vglNJbbbZJbbb:;aDEMgr:lJbbb9p9DTmbar:Ohixekcjjjj94hikadai87ebdndnaqalNJbbbZJbbb:;aqJbbbb9GEMgq:lJbbb9p9DTmbaq:Ohdxekcjjjj94hdkavad87ebdndnawalNJbbbZJbbb:;awJbbbb9GEMgw:lJbbb9p9DTmbaw:Ohdxekcjjjj94hdkabad87ebabcwfhbaecufgembkkk;siliui99iue99dnaeTmbcbhiabhlindndnJ;Zl81Zalcof8UebgvciV:Y:vgoal8Ueb:YNgrJb;:FSNJbbbZJbbb:;arJbbbb9GEMgw:lJbbb9p9DTmbaw:OhDxekcjjjj94hDkalclf8Uebhqalcdf8UebhkabavcefciGaiVcetfaD87ebdndnaoak:YNgwJb;:FSNJbbbZJbbb:;awJbbbb9GEMgx:lJbbb9p9DTmbax:Ohkxekcjjjj94hkkabavcdfciGaiVcetfak87ebdndnaoaq:YNgoJb;:FSNJbbbZJbbb:;aoJbbbb9GEMgx:lJbbb9p9DTmbax:Ohqxekcjjjj94hqkabavcufciGaiVcetfaq87ebdndnJbbjZararN:tawawN:taoaoN:tgrJbbbbarJbbbb9GE:rJb;:FSNJbbbZMgr:lJbbb9p9DTmbar:Ohqxekcjjjj94hqkabavciGaiVcetfaq87ebalcwfhlaiclfhiaecufgembkkk9mbdnadcd4ae2geTmbinababydbgdcwtcw91:Yadce91cjjj;8ifcjjj98G::NUdbabclfhbaecufgembkkk9teiucbcbydj1jjbgeabcifc98GfgbBdj1jjbdndnabZbcztgd9nmbcuhiabad9RcFFifcz4nbcuSmekaehikaik;LeeeudndnaeabVciGTmbabhixekdndnadcz9pmbabhixekabhiinaiaeydbBdbaiclfaeclfydbBdbaicwfaecwfydbBdbaicxfaecxfydbBdbaiczfhiaeczfheadc9Wfgdcs0mbkkadcl6mbinaiaeydbBdbaeclfheaiclfhiadc98fgdci0mbkkdnadTmbinaiaeRbb86bbaicefhiaecefheadcufgdmbkkabk;aeedudndnabciGTmbabhixekaecFeGc:b:c:ew2hldndnadcz9pmbabhixekabhiinaialBdbaicxfalBdbaicwfalBdbaiclfalBdbaiczfhiadc9Wfgdcs0mbkkadcl6mbinaialBdbaiclfhiadc98fgdci0mbkkdnadTmbinaiae86bbaicefhiadcufgdmbkkabkkkebcjwklz9Kbb";
@@ -25785,7 +25785,7 @@ void main() {
     };
   })();
 
-  // ../../../Users/ming/Documents/Codex/2026-06-26/SP-S/work/node_modules/three/examples/jsm/lines/LineSegmentsGeometry.js
+  // work/node_modules/three/examples/jsm/lines/LineSegmentsGeometry.js
   var _box = new Box3();
   var _vector = new Vector3();
   var LineSegmentsGeometry = class extends InstancedBufferGeometry {
@@ -25904,7 +25904,7 @@ void main() {
     }
   };
 
-  // ../../../Users/ming/Documents/Codex/2026-06-26/SP-S/work/node_modules/three/examples/jsm/lines/LineMaterial.js
+  // work/node_modules/three/examples/jsm/lines/LineMaterial.js
   UniformsLib.line = {
     worldUnits: { value: 1 },
     linewidth: { value: 1 },
@@ -26402,7 +26402,7 @@ void main() {
     }
   };
 
-  // ../../../Users/ming/Documents/Codex/2026-06-26/SP-S/work/node_modules/three/examples/jsm/lines/LineSegments2.js
+  // work/node_modules/three/examples/jsm/lines/LineSegments2.js
   var _viewport = new Vector4();
   var _start2 = new Vector3();
   var _end2 = new Vector3();
@@ -26613,7 +26613,7 @@ void main() {
     }
   };
 
-  // ../../../Users/ming/Documents/Codex/2026-06-26/SP-S/work/node_modules/three/examples/jsm/lines/LineGeometry.js
+  // work/node_modules/three/examples/jsm/lines/LineGeometry.js
   var LineGeometry = class extends LineSegmentsGeometry {
     constructor() {
       super();
@@ -26655,7 +26655,7 @@ void main() {
     }
   };
 
-  // ../../../Users/ming/Documents/Codex/2026-06-26/SP-S/work/node_modules/three/examples/jsm/lines/Line2.js
+  // work/node_modules/three/examples/jsm/lines/Line2.js
   var Line2 = class extends LineSegments2 {
     constructor(geometry = new LineGeometry(), material = new LineMaterial({ color: Math.random() * 16777215 })) {
       super(geometry, material);
@@ -26699,11 +26699,35 @@ void main() {
     }
   };
   var IK_MODES = {
+    greedyContinuity: { key: "greedy_continuity", label: "\u5C40\u90E8\u8D2A\u5FC3\u89E3\u6790 \u03C6" },
+    balancedPosture: { key: "balanced_posture", label: "\u5E73\u8861\u59FF\u6001\u89E3\u6790 \u03C6" },
+    posturePriority: { key: "posture_priority", label: "\u5F3A\u59FF\u6001\u89E3\u6790 \u03C6" },
     original: { key: "original", label: "Original" },
     balanced: { key: "balanced", label: "Balanced" },
     improved: { key: "improved", label: "Improved" },
     phiScan: { key: "phi_scan", label: "Phi Scan" },
     active5Dls: { key: "active5_dls", label: "Active-5 3D DLS" }
+  };
+  var FORMAL_IK_MODE_KEYS = [
+    IK_MODES.greedyContinuity.key,
+    IK_MODES.balancedPosture.key,
+    IK_MODES.posturePriority.key
+  ];
+  var DEFAULT_FORMAL_IK_MODE = IK_MODES.posturePriority.key;
+  var FORMAL_PHI_IK_PARAMS = {
+    candidatePhiStepDeg: 0.2,
+    refinementIterations: 12,
+    fallbackPhiStepDeg: 0.01,
+    targetToolAbsoluteAngleDeg: -90,
+    actuatorToleranceMm: 1e-6,
+    linkageToleranceMm: 0.01,
+    referenceDeg: { arm1: 70, arm2: 90, arm3: 90, offset: -20 },
+    weights: {
+      greedy_continuity: { movement: 1, smoothness: 0.35, posture: 0 },
+      balanced_posture: { movement: 1, smoothness: 1.15, posture: 3e-3 },
+      posture_priority: { movement: 0.8, smoothness: 2.5, posture: 0.012 }
+    },
+    barrierWeight: 2e-7
   };
   var IK_CONTINUITY_WEIGHTS = { base: 0.02, arm1: 0.08, arm2: 0.04, arm3: 0.04, offset: 0.02 };
   var IK_DQ_LIMIT_DEG = { base: 2, arm1: 6, arm2: 6, arm3: 6, offset: 2 };
@@ -27181,11 +27205,14 @@ void main() {
     return actuatorStrokeViolationForPose(computePose(state2));
   }
   function normalizedIkMode(mode) {
+    if (mode === IK_MODES.greedyContinuity.key) return IK_MODES.greedyContinuity.key;
+    if (mode === IK_MODES.balancedPosture.key) return IK_MODES.balancedPosture.key;
+    if (mode === IK_MODES.posturePriority.key) return IK_MODES.posturePriority.key;
     if (mode === IK_MODES.balanced.key) return IK_MODES.balanced.key;
     if (mode === IK_MODES.improved.key) return IK_MODES.improved.key;
     if (mode === IK_MODES.phiScan.key) return IK_MODES.phiScan.key;
     if (mode === IK_MODES.active5Dls.key || mode === "active3_dls") return IK_MODES.active5Dls.key;
-    return IK_MODES.original.key;
+    return DEFAULT_FORMAL_IK_MODE;
   }
   function ikDeltaDeg(candidate, currentState) {
     return {
@@ -27460,6 +27487,272 @@ void main() {
     const rateLimited = applyIkRateLimit(bestCandidate, current);
     return applyIkAccelerationLimit(rateLimited.state, current, previousDelta, PHI_SCAN_IK_PARAMS.ddqLimitDeg).state;
   }
+  function isFormalPhiIkMode(ikMode) {
+    return FORMAL_IK_MODE_KEYS.includes(ikMode);
+  }
+  function formalPlanarKeys() {
+    return ["arm1", "arm2", "arm3", "offset"];
+  }
+  function formalCandidateLimits() {
+    return Object.fromEntries(["base", ...formalPlanarKeys()].map((key) => [key, {
+      min: LIMITS[key].min,
+      max: LIMITS[key].max
+    }]));
+  }
+  function formalMinimumNormalizedMargin(state2, limits) {
+    return Math.min(...formalPlanarKeys().map((key) => {
+      const limit = limits[key];
+      const range = Math.max(limit.max - limit.min, 1e-9);
+      return Math.min(state2[key] - limit.min, limit.max - state2[key]) / range;
+    }));
+  }
+  function formalBaseCandidatesForTarget(targetWorld, displayOffset = {}) {
+    const pivot = BASE_LINK_PIVOT_MM;
+    const dx = Number(targetWorld.x) - pivot.x;
+    const dy = Number(targetWorld.y || 0) - (pivot.y || 0);
+    const desiredLocalY = Number(displayOffset.y || 0);
+    const radius = Math.hypot(dx, dy);
+    if (radius < 1e-3 || Math.abs(desiredLocalY - (pivot.y || 0)) > radius + 1e-9) return [];
+    const alpha = Math.atan2(dy, dx);
+    const asinValue = Math.asin(clamp2((desiredLocalY - (pivot.y || 0)) / radius, -1, 1));
+    return [
+      wrapDegrees((asinValue - alpha) * 180 / Math.PI),
+      wrapDegrees((Math.PI - asinValue - alpha) * 180 / Math.PI)
+    ].filter(
+      (value, index, values) => value >= LIMITS.base.min - 1e-8 && value <= LIMITS.base.max + 1e-8 && values.findIndex((candidate) => Math.abs(angleDistance(candidate, value)) < 1e-6) === index
+    );
+  }
+  function formalLocalTargetForBase(targetWorld, baseDeg, displayOffset = {}) {
+    const localDisplayTarget = rotateXYAround(targetWorld, baseDeg);
+    return {
+      x: localDisplayTarget.x - (displayOffset.x || 0),
+      y: localDisplayTarget.y - (displayOffset.y || 0),
+      z: localDisplayTarget.z - (displayOffset.z || 0),
+      lateralResidualMm: Math.abs((localDisplayTarget.y || 0) - (displayOffset.y || 0))
+    };
+  }
+  function formalAnalyticCandidateAtPhi(localTarget, baseDeg, phiDeg, elbowSign, limits) {
+    const phi = degToRad2(phiDeg);
+    const axisTip = {
+      x: localTarget.x - JOINTS.baseArm1.x,
+      z: localTarget.z - JOINTS.baseArm1.z + TOOL_LENGTH_MM
+    };
+    const arm2Tip = {
+      x: axisTip.x - ARM_LENGTHS_MM.arm3 * Math.cos(phi),
+      z: axisTip.z - ARM_LENGTHS_MM.arm3 * Math.sin(phi)
+    };
+    const cosine = (arm2Tip.x ** 2 + arm2Tip.z ** 2 - ARM_LENGTHS_MM.arm1 ** 2 - ARM_LENGTHS_MM.arm2 ** 2) / (2 * ARM_LENGTHS_MM.arm1 * ARM_LENGTHS_MM.arm2);
+    if (Math.abs(cosine) > 1 + 1e-10) return null;
+    const root2 = Math.sqrt(Math.max(0, 1 - clamp2(cosine, -1, 1) ** 2));
+    const beta = Math.atan2(elbowSign * root2, clamp2(cosine, -1, 1));
+    const absoluteArm1 = Math.atan2(arm2Tip.z, arm2Tip.x) - Math.atan2(ARM_LENGTHS_MM.arm2 * Math.sin(beta), ARM_LENGTHS_MM.arm1 + ARM_LENGTHS_MM.arm2 * Math.cos(beta));
+    const absoluteArm2 = absoluteArm1 + beta;
+    const state2 = {
+      base: baseDeg,
+      arm1: absoluteArm1 * 180 / Math.PI,
+      arm2: (absoluteArm1 - absoluteArm2) * 180 / Math.PI,
+      arm3: (absoluteArm2 - phi) * 180 / Math.PI,
+      offset: phiDeg - FORMAL_PHI_IK_PARAMS.targetToolAbsoluteAngleDeg
+    };
+    for (const key of ["base", ...formalPlanarKeys()]) {
+      const limit = limits[key];
+      if (state2[key] < limit.min - 1e-8 || state2[key] > limit.max + 1e-8) return null;
+    }
+    return {
+      state: state2,
+      phiDeg,
+      elbowSign,
+      minimumNormalizedMargin: formalMinimumNormalizedMargin(state2, limits)
+    };
+  }
+  function formalFixedLinkCandidates(anchor1, length1, anchor2, length2, preferred) {
+    const dx = anchor2.x - anchor1.x;
+    const dz = anchor2.z - anchor1.z;
+    const distanceXZ = Math.hypot(dx, dz);
+    if (distanceXZ < 1e-3) return [];
+    const ux = dx / distanceXZ;
+    const uz = dz / distanceXZ;
+    const along = (length1 ** 2 - length2 ** 2 + distanceXZ ** 2) / (2 * distanceXZ);
+    const heightSquared = length1 ** 2 - along ** 2;
+    if (heightSquared < -1e-6) return [];
+    const height = Math.sqrt(Math.max(0, heightSquared));
+    const base = {
+      x: anchor1.x + ux * along,
+      y: preferred.y || 0,
+      z: anchor1.z + uz * along
+    };
+    return [
+      { x: base.x - uz * height, y: base.y, z: base.z + ux * height },
+      { x: base.x + uz * height, y: base.y, z: base.z - ux * height }
+    ];
+  }
+  function formalLinkageBranchIndexForPose(pose, group) {
+    const link1Anchor = pointOnPoseSegment(pose, group.link1.anchorWorldAtCalibration, group.link1.anchorOn);
+    const link2Anchor = pointOnPoseSegment(pose, group.link2.anchorWorldAtCalibration, group.link2.anchorOn);
+    const preferred = pointOnPoseSegment(pose, group.commonWorldAtCalibration, group.commonOn);
+    const candidates = formalFixedLinkCandidates(link1Anchor, group.link1.length, link2Anchor, group.link2.length, preferred);
+    if (candidates.length < 2) return { ok: false, index: -1, error: "linkage_unreachable" };
+    const index = distance(candidates[0], preferred) <= distance(candidates[1], preferred) ? 0 : 1;
+    return { ok: true, index };
+  }
+  var FORMAL_CALIBRATION_BRANCH_INDEX = (() => {
+    const pose = computePose(CALIBRATION_STATE, { clampLimits: false });
+    return {
+      A: formalLinkageBranchIndexForPose(pose, LINKAGE_GROUPS.A).index,
+      B: formalLinkageBranchIndexForPose(pose, LINKAGE_GROUPS.B).index
+    };
+  })();
+  function formalCandidateSample(candidate, targetWorld, displayOffset = {}) {
+    const state2 = clampState(candidate.state);
+    const pose = computePose(state2);
+    if (actuatorStrokeViolationForPose(pose) > FORMAL_PHI_IK_PARAMS.actuatorToleranceMm) {
+      return { valid: false, error: "actuator_stroke_outside_strict_limit" };
+    }
+    if (Math.max(pose.linkages.A.center.solveError || 0, pose.linkages.B.center.solveError || 0) > FORMAL_PHI_IK_PARAMS.linkageToleranceMm) {
+      return { valid: false, error: "linkage_closure_error" };
+    }
+    const branchA = formalLinkageBranchIndexForPose(pose, LINKAGE_GROUPS.A);
+    const branchB = formalLinkageBranchIndexForPose(pose, LINKAGE_GROUPS.B);
+    if (!branchA.ok || !branchB.ok || branchA.index !== FORMAL_CALIBRATION_BRANCH_INDEX.A || branchB.index !== FORMAL_CALIBRATION_BRANCH_INDEX.B) {
+      return { valid: false, error: "wrong_linkage_branch" };
+    }
+    const actualTcp = worldDisplayedToolPointForState(state2, displayOffset);
+    const residualMm = distance(actualTcp, targetWorld);
+    const toolVerticalErrorDeg = angleDistance(FORMAL_PHI_IK_PARAMS.targetToolAbsoluteAngleDeg, active5ToolAngleDeg(state2));
+    return {
+      valid: true,
+      state: state2,
+      pose,
+      actualTcp,
+      residualMm,
+      toolVerticalErrorDeg,
+      phiDeg: candidate.phiDeg,
+      elbowSign: candidate.elbowSign,
+      minimumNormalizedMargin: candidate.minimumNormalizedMargin,
+      actuatorViolation: actuatorStrokeViolationForPose(pose)
+    };
+  }
+  function formalCandidateScore(candidate, previous, previousPrevious, ikMode, limits, initial = false) {
+    const reference = FORMAL_PHI_IK_PARAMS.referenceDeg;
+    if (initial || !previous) {
+      const referenceCost = formalPlanarKeys().reduce((sum, key) => {
+        const limit = limits[key];
+        const range = Math.max(limit.max - limit.min, 1e-9);
+        return sum + ((candidate.state[key] - reference[key]) / range) ** 2;
+      }, 0);
+      return -candidate.minimumNormalizedMargin + referenceCost * 5e-3;
+    }
+    let movement = 0;
+    let smoothness = 0;
+    let posture = 0;
+    let barrier = 0;
+    for (const key of formalPlanarKeys()) {
+      const limit = limits[key];
+      const range = Math.max(limit.max - limit.min, 1e-9);
+      const predicted = previousPrevious ? previous[key] + (previous[key] - previousPrevious[key]) : previous[key];
+      movement += ((candidate.state[key] - predicted) / range) ** 2;
+      if (previousPrevious) {
+        smoothness += ((candidate.state[key] - 2 * previous[key] + previousPrevious[key]) / range) ** 2;
+      }
+      const normalizedMargin = Math.max(
+        Math.min(candidate.state[key] - limit.min, limit.max - candidate.state[key]) / range,
+        1e-8
+      );
+      barrier += 1 / (normalizedMargin + 0.01) ** 2;
+      posture += ((candidate.state[key] - reference[key]) / range) ** 2;
+    }
+    const weights = FORMAL_PHI_IK_PARAMS.weights[ikMode] || FORMAL_PHI_IK_PARAMS.weights.greedy_continuity;
+    return movement * weights.movement + smoothness * weights.smoothness + posture * weights.posture + barrier * FORMAL_PHI_IK_PARAMS.barrierWeight;
+  }
+  function formalRefineCandidate(localTarget, baseDeg, selected, previous, previousPrevious, ikMode, limits, initial) {
+    let best = selected;
+    let bestScore = formalCandidateScore(best, previous, previousPrevious, ikMode, limits, initial);
+    let halfWidth = Math.max(FORMAL_PHI_IK_PARAMS.candidatePhiStepDeg, 0.02);
+    for (let iteration = 0; iteration < FORMAL_PHI_IK_PARAMS.refinementIterations; iteration += 1) {
+      for (const phiDeg of [best.phiDeg - halfWidth / 2, best.phiDeg + halfWidth / 2]) {
+        const candidate = formalAnalyticCandidateAtPhi(localTarget, baseDeg, phiDeg, best.elbowSign, limits);
+        if (!candidate) continue;
+        const score = formalCandidateScore(candidate, previous, previousPrevious, ikMode, limits, initial);
+        if (score < bestScore) {
+          best = candidate;
+          bestScore = score;
+        }
+      }
+      halfWidth /= 2;
+    }
+    return best;
+  }
+  function formalCandidatesForLocalTarget(localTarget, baseDeg, limits, phiStepDeg) {
+    const phiMinimum = limits.offset.min + FORMAL_PHI_IK_PARAMS.targetToolAbsoluteAngleDeg;
+    const phiMaximum = limits.offset.max + FORMAL_PHI_IK_PARAMS.targetToolAbsoluteAngleDeg;
+    const step = Math.max(1e-3, Number(phiStepDeg));
+    const count = Math.max(1, Math.ceil((phiMaximum - phiMinimum) / step));
+    const candidates = [];
+    for (let index = 0; index <= count; index += 1) {
+      const phiDeg = index === count ? phiMaximum : phiMinimum + index * step;
+      for (const elbowSign of [-1, 1]) {
+        const candidate = formalAnalyticCandidateAtPhi(localTarget, baseDeg, phiDeg, elbowSign, limits);
+        if (candidate) candidates.push(candidate);
+      }
+    }
+    return candidates;
+  }
+  function formalSelectCandidate(targetWorld, displayOffset, ikMode, currentState, previousState, previousPreviousState, initial = false) {
+    const limits = formalCandidateLimits();
+    let bestSample = null;
+    let bestScore = Infinity;
+    for (const baseDeg of formalBaseCandidatesForTarget(targetWorld, displayOffset)) {
+      const localTarget = formalLocalTargetForBase(targetWorld, baseDeg, displayOffset);
+      if (localTarget.lateralResidualMm > 0.01) continue;
+      let candidates = formalCandidatesForLocalTarget(localTarget, baseDeg, limits, FORMAL_PHI_IK_PARAMS.candidatePhiStepDeg);
+      if (!candidates.length) {
+        candidates = formalCandidatesForLocalTarget(localTarget, baseDeg, limits, FORMAL_PHI_IK_PARAMS.fallbackPhiStepDeg);
+      }
+      const rejected = /* @__PURE__ */ new Set();
+      for (let attempt = 0; attempt < Math.min(candidates.length, 24); attempt += 1) {
+        const available = candidates.filter((candidate) => !rejected.has(candidate));
+        if (!available.length) break;
+        let selected = available[0];
+        let selectedScore = formalCandidateScore(selected, previousState, previousPreviousState, ikMode, limits, initial);
+        for (let index = 1; index < available.length; index += 1) {
+          const score = formalCandidateScore(available[index], previousState, previousPreviousState, ikMode, limits, initial);
+          if (score < selectedScore) {
+            selected = available[index];
+            selectedScore = score;
+          }
+        }
+        selected = formalRefineCandidate(localTarget, baseDeg, selected, previousState, previousPreviousState, ikMode, limits, initial);
+        const sample = formalCandidateSample(selected, targetWorld, displayOffset);
+        if (sample.valid) {
+          const baseTieBreak = previousState ? (angleDistance(sample.state.base, previousState.base) / 360) ** 2 * 1e-6 : 0;
+          const score = formalCandidateScore(selected, previousState, previousPreviousState, ikMode, limits, initial) + baseTieBreak;
+          if (score < bestScore) {
+            bestScore = score;
+            bestSample = { ...sample, score, localTarget };
+          }
+          break;
+        }
+        let closest = candidates[0];
+        let distanceToSelected = Infinity;
+        for (const candidate of candidates) {
+          const difference = Math.abs(candidate.phiDeg - selected.phiDeg) + (candidate.elbowSign === selected.elbowSign ? 0 : 1e3);
+          if (difference < distanceToSelected) {
+            closest = candidate;
+            distanceToSelected = difference;
+          }
+        }
+        rejected.add(closest);
+      }
+    }
+    return bestSample;
+  }
+  function solveFormalPhiIk(targetWorld, currentState, displayOffset, ikMode, options = {}) {
+    const current = clampState(currentState);
+    const previousState = options.previousState ? clampState(options.previousState) : current;
+    const previousPreviousState = options.previousPreviousState ? clampState(options.previousPreviousState) : null;
+    const initial = !options.previousState;
+    return formalSelectCandidate(targetWorld, displayOffset, ikMode, current, previousState, previousPreviousState, initial);
+  }
   function solveLinearSystem(matrix, vector) {
     const m = matrix.map((row, index) => [...row, vector[index]]);
     const size = vector.length;
@@ -27649,6 +27942,62 @@ void main() {
       const distance2 = Math.hypot(displayTip.x - target.x, displayTip.y - target.y, displayTip.z - target.z);
       return ikScoreFromDistance(distance2, state2, currentState, previousDelta, ikMode);
     };
+    if (isFormalPhiIkMode(ikMode)) {
+      const formalSample = solveFormalPhiIk(target, candidate, displayOffset, ikMode, {
+        previousState: options.previousState,
+        previousPreviousState: options.previousPreviousState
+      });
+      if (formalSample) {
+        const delta = ikDeltaDeg(formalSample.state, currentState);
+        return {
+          state: formalSample.state,
+          pose: formalSample.pose,
+          target,
+          error: formalSample.residualMm,
+          rawError: formalSample.residualMm,
+          ikMode,
+          delta,
+          rateLimited: false,
+          rateLimitScale: 1,
+          metrics: ikStepMetrics(formalSample.state, currentState, previousDelta),
+          actuatorViolation: formalSample.actuatorViolation,
+          reachable: formalSample.residualMm < 1 && Math.abs(formalSample.toolVerticalErrorDeg) < 1e-3,
+          formalPhi: {
+            phiDeg: formalSample.phiDeg,
+            elbowSign: formalSample.elbowSign,
+            score: formalSample.score,
+            residualMm: formalSample.residualMm,
+            toolVerticalErrorDeg: formalSample.toolVerticalErrorDeg,
+            minimumNormalizedMargin: formalSample.minimumNormalizedMargin,
+            baseAdaptation: {
+              formula: "local = rotateXYAround(targetWorld, base); choose base so local.y equals displayOffset.y, then solve local.x/local.z with analytic phi",
+              localTarget: formalSample.localTarget
+            }
+          }
+        };
+      }
+      const currentResidual = distance(currentDisplayTip, target);
+      return {
+        state: candidate,
+        pose: computePose(candidate),
+        target,
+        error: currentResidual,
+        rawError: currentResidual,
+        ikMode,
+        delta: { base: 0, arm1: 0, arm2: 0, arm3: 0, offset: 0 },
+        rateLimited: false,
+        rateLimitScale: 1,
+        metrics: ikStepMetrics(candidate, currentState, previousDelta),
+        actuatorViolation: actuatorStrokeViolationForState(candidate),
+        reachable: false,
+        formalPhi: {
+          error: "no_strict_analytic_phi_candidate",
+          baseAdaptation: {
+            formula: "local = rotateXYAround(targetWorld, base); choose base so local.y equals displayOffset.y, then solve local.x/local.z with analytic phi"
+          }
+        }
+      };
+    }
     if (ikMode === IK_MODES.phiScan.key) {
       const phiCandidate = solvePhiScanIk(target, candidate, displayOffset, score, previousDelta);
       if (phiCandidate) {
@@ -27707,7 +28056,7 @@ void main() {
   }
 
   // outputs/html-version/app.mjs
-  var SCRIPT_VERSION = "20260722-demo-path-v18";
+  var SCRIPT_VERSION = "20260723-glb-calibration-pose";
   var RENDER_SCALE = 1 / 1e3;
   var QT_STAGE_MODE = new URLSearchParams(window.location.search).has("qtStage");
   if (QT_STAGE_MODE) document.documentElement.dataset.qtStage = "true";
@@ -28264,8 +28613,10 @@ void main() {
     pathMode: "interpolated",
     pathSourceName: "",
     pathStatus: "\u672A\u5BFC\u5165\u8DEF\u5F84\u6587\u4EF6",
-    ikMode: "active5_dls",
+    ikMode: DEFAULT_FORMAL_IK_MODE,
     previousIkDelta: { base: 0, arm1: 0, arm2: 0, arm3: 0, offset: 0 },
+    previousIkState: null,
+    previousPreviousIkState: null,
     progress: 0,
     speed: 500,
     animationFrame: null,
@@ -29239,11 +29590,9 @@ void main() {
       <label>\u672B\u7AEF\u901F\u5EA6 mm/s <input id="linearSpeed" type="number" min="1" step="10" value="${linearMotion.speed}" /></label>
       <label>IK\u7B97\u6CD5
         <select id="linearIkMode">
-          <option value="original">Original</option>
-          <option value="balanced">Balanced</option>
-          <option value="improved">Improved</option>
-          <option value="phi_scan">Phi Scan</option>
-          <option value="active5_dls">Active-5 3D DLS</option>
+          <option value="${IK_MODES.greedyContinuity.key}">${IK_MODES.greedyContinuity.label}</option>
+          <option value="${IK_MODES.balancedPosture.key}">${IK_MODES.balancedPosture.label}</option>
+          <option value="${IK_MODES.posturePriority.key}">${IK_MODES.posturePriority.label}</option>
         </select>
       </label>
       <label>\u8DEF\u5F84\u957F\u5EA6 <output id="linearPathDistance">0 mm</output></label>
@@ -29305,7 +29654,7 @@ void main() {
     });
     document.querySelector("#linearIkMode").addEventListener("change", (event) => {
       stopLinearSimulation();
-      linearMotion.ikMode = ["balanced", "improved", "phi_scan", "active5_dls"].includes(event.target.value) ? event.target.value : "original";
+      linearMotion.ikMode = FORMAL_IK_MODE_KEYS.includes(event.target.value) ? event.target.value : DEFAULT_FORMAL_IK_MODE;
       resetLinearIkHistory();
       runLinearMotion({ resetToStartState: importedLinearPathActive() });
     });
@@ -29343,6 +29692,8 @@ void main() {
   }
   function resetLinearIkHistory() {
     linearMotion.previousIkDelta = { base: 0, arm1: 0, arm2: 0, arm3: 0, offset: 0 };
+    linearMotion.previousIkState = null;
+    linearMotion.previousPreviousIkState = null;
   }
   function resetLinearPlaybackDistance() {
     linearMotion.lastFrameAt = 0;
@@ -29589,13 +29940,20 @@ void main() {
     const solved = solveStateForWorldDisplayedToolTarget(target, state, TOOL_BALL_STICK_OFFSET_MM, {
       ikMode: linearMotion.ikMode,
       previousDelta: linearMotion.previousIkDelta,
+      previousState: linearMotion.previousIkState,
+      previousPreviousState: linearMotion.previousPreviousIkState,
       stepScale: ikStepScale
     });
     commitLinearMotionSolution(solved);
   }
+  function advanceLinearIkHistory(nextState, delta) {
+    linearMotion.previousPreviousIkState = linearMotion.previousIkState ? { ...linearMotion.previousIkState } : null;
+    linearMotion.previousIkState = { ...nextState };
+    linearMotion.previousIkDelta = delta || linearMotion.previousIkDelta;
+  }
   function commitLinearMotionSolution(solved) {
     Object.assign(state, solved.state);
-    linearMotion.previousIkDelta = solved.delta || linearMotion.previousIkDelta;
+    advanceLinearIkHistory(solved.state, solved.delta);
     applyToolVerticalConstraint();
     update(solved.error);
   }
@@ -29603,6 +29961,8 @@ void main() {
     return solveStateForWorldDisplayedToolTarget(linearTargetFromDistance(distanceMm), sourceState, TOOL_BALL_STICK_OFFSET_MM, {
       ikMode: linearMotion.ikMode,
       previousDelta,
+      previousState: linearMotion.previousIkState,
+      previousPreviousState: linearMotion.previousPreviousIkState,
       stepScale: ikStepScale
     });
   }
@@ -29657,7 +30017,9 @@ void main() {
     } else if (linearMotion.startWorld) {
       const solved = solveStateForWorldDisplayedToolTarget(linearMotion.startWorld, state, TOOL_BALL_STICK_OFFSET_MM, {
         ikMode: linearMotion.ikMode,
-        previousDelta: linearMotion.previousIkDelta
+        previousDelta: linearMotion.previousIkDelta,
+        previousState: linearMotion.previousIkState,
+        previousPreviousState: linearMotion.previousPreviousIkState
       });
       Object.assign(state, solved.state);
     }
@@ -29796,10 +30158,12 @@ void main() {
     const targetWorld = roundedWorldPoint(worldPoint);
     const solved = solveStateForWorldDisplayedToolTarget(targetWorld, state, TOOL_BALL_STICK_OFFSET_MM, {
       ikMode: linearMotion.ikMode,
-      previousDelta: linearMotion.previousIkDelta
+      previousDelta: linearMotion.previousIkDelta,
+      previousState: linearMotion.previousIkState,
+      previousPreviousState: linearMotion.previousPreviousIkState
     });
     Object.assign(state, solved.state);
-    linearMotion.previousIkDelta = solved.delta || linearMotion.previousIkDelta;
+    advanceLinearIkHistory(solved.state, solved.delta);
     applyToolVerticalConstraint();
     linearMotion.endWorld = targetWorld;
     linearMotion.progress = 100;

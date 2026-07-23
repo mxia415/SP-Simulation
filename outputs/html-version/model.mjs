@@ -36,11 +36,35 @@ export const PRESETS = {
 };
 
 export const IK_MODES = {
+  greedyContinuity: { key: "greedy_continuity", label: "局部贪心解析 φ" },
+  balancedPosture: { key: "balanced_posture", label: "平衡姿态解析 φ" },
+  posturePriority: { key: "posture_priority", label: "强姿态解析 φ" },
   original: { key: "original", label: "Original" },
   balanced: { key: "balanced", label: "Balanced" },
   improved: { key: "improved", label: "Improved" },
   phiScan: { key: "phi_scan", label: "Phi Scan" },
   active5Dls: { key: "active5_dls", label: "Active-5 3D DLS" },
+};
+export const FORMAL_IK_MODE_KEYS = [
+  IK_MODES.greedyContinuity.key,
+  IK_MODES.balancedPosture.key,
+  IK_MODES.posturePriority.key,
+];
+export const DEFAULT_FORMAL_IK_MODE = IK_MODES.posturePriority.key;
+export const FORMAL_PHI_IK_PARAMS = {
+  candidatePhiStepDeg: 0.2,
+  refinementIterations: 12,
+  fallbackPhiStepDeg: 0.01,
+  targetToolAbsoluteAngleDeg: -90,
+  actuatorToleranceMm: 1e-6,
+  linkageToleranceMm: 0.01,
+  referenceDeg: { arm1: 70, arm2: 90, arm3: 90, offset: -20 },
+  weights: {
+    greedy_continuity: { movement: 1, smoothness: 0.35, posture: 0 },
+    balanced_posture: { movement: 1, smoothness: 1.15, posture: 0.003 },
+    posture_priority: { movement: 0.8, smoothness: 2.5, posture: 0.012 },
+  },
+  barrierWeight: 2e-7,
 };
 
 export const IK_CONTINUITY_WEIGHTS = { base: 0.02, arm1: 0.08, arm2: 0.04, arm3: 0.04, offset: 0.02 };
@@ -574,11 +598,14 @@ function actuatorStrokeViolationForState(state) {
 }
 
 function normalizedIkMode(mode) {
+  if (mode === IK_MODES.greedyContinuity.key) return IK_MODES.greedyContinuity.key;
+  if (mode === IK_MODES.balancedPosture.key) return IK_MODES.balancedPosture.key;
+  if (mode === IK_MODES.posturePriority.key) return IK_MODES.posturePriority.key;
   if (mode === IK_MODES.balanced.key) return IK_MODES.balanced.key;
   if (mode === IK_MODES.improved.key) return IK_MODES.improved.key;
   if (mode === IK_MODES.phiScan.key) return IK_MODES.phiScan.key;
   if (mode === IK_MODES.active5Dls.key || mode === "active3_dls") return IK_MODES.active5Dls.key;
-  return IK_MODES.original.key;
+  return DEFAULT_FORMAL_IK_MODE;
 }
 
 function ikDeltaDeg(candidate, currentState) {
@@ -935,6 +962,301 @@ function solvePhiScanIk(targetWorld, currentState, displayOffset, score, previou
   return applyIkAccelerationLimit(rateLimited.state, current, previousDelta, PHI_SCAN_IK_PARAMS.ddqLimitDeg).state;
 }
 
+function isFormalPhiIkMode(ikMode) {
+  return FORMAL_IK_MODE_KEYS.includes(ikMode);
+}
+
+function formalPlanarKeys() {
+  return ["arm1", "arm2", "arm3", "offset"];
+}
+
+function formalCandidateLimits() {
+  return Object.fromEntries(["base", ...formalPlanarKeys()].map((key) => [key, {
+    min: LIMITS[key].min,
+    max: LIMITS[key].max,
+  }]));
+}
+
+function formalMinimumNormalizedMargin(state, limits) {
+  return Math.min(...formalPlanarKeys().map((key) => {
+    const limit = limits[key];
+    const range = Math.max(limit.max - limit.min, 1e-9);
+    return Math.min(state[key] - limit.min, limit.max - state[key]) / range;
+  }));
+}
+
+function formalBaseCandidatesForTarget(targetWorld, displayOffset = {}) {
+  const pivot = BASE_LINK_PIVOT_MM;
+  const dx = Number(targetWorld.x) - pivot.x;
+  const dy = Number(targetWorld.y || 0) - (pivot.y || 0);
+  const desiredLocalY = Number(displayOffset.y || 0);
+  const radius = Math.hypot(dx, dy);
+  if (radius < 0.001 || Math.abs(desiredLocalY - (pivot.y || 0)) > radius + 1e-9) return [];
+  const alpha = Math.atan2(dy, dx);
+  const asinValue = Math.asin(clamp((desiredLocalY - (pivot.y || 0)) / radius, -1, 1));
+  return [
+    wrapDegrees((asinValue - alpha) * 180 / Math.PI),
+    wrapDegrees((Math.PI - asinValue - alpha) * 180 / Math.PI),
+  ].filter((value, index, values) =>
+    value >= LIMITS.base.min - 1e-8 &&
+    value <= LIMITS.base.max + 1e-8 &&
+    values.findIndex((candidate) => Math.abs(angleDistance(candidate, value)) < 1e-6) === index
+  );
+}
+
+function formalLocalTargetForBase(targetWorld, baseDeg, displayOffset = {}) {
+  const localDisplayTarget = rotateXYAround(targetWorld, baseDeg);
+  return {
+    x: localDisplayTarget.x - (displayOffset.x || 0),
+    y: localDisplayTarget.y - (displayOffset.y || 0),
+    z: localDisplayTarget.z - (displayOffset.z || 0),
+    lateralResidualMm: Math.abs((localDisplayTarget.y || 0) - (displayOffset.y || 0)),
+  };
+}
+
+function formalAnalyticCandidateAtPhi(localTarget, baseDeg, phiDeg, elbowSign, limits) {
+  const phi = degToRad(phiDeg);
+  const axisTip = {
+    x: localTarget.x - JOINTS.baseArm1.x,
+    z: localTarget.z - JOINTS.baseArm1.z + TOOL_LENGTH_MM,
+  };
+  const arm2Tip = {
+    x: axisTip.x - ARM_LENGTHS_MM.arm3 * Math.cos(phi),
+    z: axisTip.z - ARM_LENGTHS_MM.arm3 * Math.sin(phi),
+  };
+  const cosine = (
+    arm2Tip.x ** 2 + arm2Tip.z ** 2 - ARM_LENGTHS_MM.arm1 ** 2 - ARM_LENGTHS_MM.arm2 ** 2
+  ) / (2 * ARM_LENGTHS_MM.arm1 * ARM_LENGTHS_MM.arm2);
+  if (Math.abs(cosine) > 1 + 1e-10) return null;
+  const root = Math.sqrt(Math.max(0, 1 - clamp(cosine, -1, 1) ** 2));
+  const beta = Math.atan2(elbowSign * root, clamp(cosine, -1, 1));
+  const absoluteArm1 = Math.atan2(arm2Tip.z, arm2Tip.x)
+    - Math.atan2(ARM_LENGTHS_MM.arm2 * Math.sin(beta), ARM_LENGTHS_MM.arm1 + ARM_LENGTHS_MM.arm2 * Math.cos(beta));
+  const absoluteArm2 = absoluteArm1 + beta;
+  const state = {
+    base: baseDeg,
+    arm1: absoluteArm1 * 180 / Math.PI,
+    arm2: (absoluteArm1 - absoluteArm2) * 180 / Math.PI,
+    arm3: (absoluteArm2 - phi) * 180 / Math.PI,
+    offset: phiDeg - FORMAL_PHI_IK_PARAMS.targetToolAbsoluteAngleDeg,
+  };
+  for (const key of ["base", ...formalPlanarKeys()]) {
+    const limit = limits[key];
+    if (state[key] < limit.min - 1e-8 || state[key] > limit.max + 1e-8) return null;
+  }
+  return {
+    state,
+    phiDeg,
+    elbowSign,
+    minimumNormalizedMargin: formalMinimumNormalizedMargin(state, limits),
+  };
+}
+
+function formalFixedLinkCandidates(anchor1, length1, anchor2, length2, preferred) {
+  const dx = anchor2.x - anchor1.x;
+  const dz = anchor2.z - anchor1.z;
+  const distanceXZ = Math.hypot(dx, dz);
+  if (distanceXZ < 0.001) return [];
+  const ux = dx / distanceXZ;
+  const uz = dz / distanceXZ;
+  const along = (length1 ** 2 - length2 ** 2 + distanceXZ ** 2) / (2 * distanceXZ);
+  const heightSquared = length1 ** 2 - along ** 2;
+  if (heightSquared < -1e-6) return [];
+  const height = Math.sqrt(Math.max(0, heightSquared));
+  const base = {
+    x: anchor1.x + ux * along,
+    y: preferred.y || 0,
+    z: anchor1.z + uz * along,
+  };
+  return [
+    { x: base.x - uz * height, y: base.y, z: base.z + ux * height },
+    { x: base.x + uz * height, y: base.y, z: base.z - ux * height },
+  ];
+}
+
+function formalLinkageBranchIndexForPose(pose, group) {
+  const link1Anchor = pointOnPoseSegment(pose, group.link1.anchorWorldAtCalibration, group.link1.anchorOn);
+  const link2Anchor = pointOnPoseSegment(pose, group.link2.anchorWorldAtCalibration, group.link2.anchorOn);
+  const preferred = pointOnPoseSegment(pose, group.commonWorldAtCalibration, group.commonOn);
+  const candidates = formalFixedLinkCandidates(link1Anchor, group.link1.length, link2Anchor, group.link2.length, preferred);
+  if (candidates.length < 2) return { ok: false, index: -1, error: "linkage_unreachable" };
+  const index = distance(candidates[0], preferred) <= distance(candidates[1], preferred) ? 0 : 1;
+  return { ok: true, index };
+}
+
+const FORMAL_CALIBRATION_BRANCH_INDEX = (() => {
+  const pose = computePose(CALIBRATION_STATE, { clampLimits: false });
+  return {
+    A: formalLinkageBranchIndexForPose(pose, LINKAGE_GROUPS.A).index,
+    B: formalLinkageBranchIndexForPose(pose, LINKAGE_GROUPS.B).index,
+  };
+})();
+
+function formalCandidateSample(candidate, targetWorld, displayOffset = {}) {
+  const state = clampState(candidate.state);
+  const pose = computePose(state);
+  if (actuatorStrokeViolationForPose(pose) > FORMAL_PHI_IK_PARAMS.actuatorToleranceMm) {
+    return { valid: false, error: "actuator_stroke_outside_strict_limit" };
+  }
+  if (Math.max(pose.linkages.A.center.solveError || 0, pose.linkages.B.center.solveError || 0) > FORMAL_PHI_IK_PARAMS.linkageToleranceMm) {
+    return { valid: false, error: "linkage_closure_error" };
+  }
+  const branchA = formalLinkageBranchIndexForPose(pose, LINKAGE_GROUPS.A);
+  const branchB = formalLinkageBranchIndexForPose(pose, LINKAGE_GROUPS.B);
+  if (!branchA.ok || !branchB.ok || branchA.index !== FORMAL_CALIBRATION_BRANCH_INDEX.A || branchB.index !== FORMAL_CALIBRATION_BRANCH_INDEX.B) {
+    return { valid: false, error: "wrong_linkage_branch" };
+  }
+  const actualTcp = worldDisplayedToolPointForState(state, displayOffset);
+  const residualMm = distance(actualTcp, targetWorld);
+  const toolVerticalErrorDeg = angleDistance(FORMAL_PHI_IK_PARAMS.targetToolAbsoluteAngleDeg, active5ToolAngleDeg(state));
+  return {
+    valid: true,
+    state,
+    pose,
+    actualTcp,
+    residualMm,
+    toolVerticalErrorDeg,
+    phiDeg: candidate.phiDeg,
+    elbowSign: candidate.elbowSign,
+    minimumNormalizedMargin: candidate.minimumNormalizedMargin,
+    actuatorViolation: actuatorStrokeViolationForPose(pose),
+  };
+}
+
+function formalCandidateScore(candidate, previous, previousPrevious, ikMode, limits, initial = false) {
+  const reference = FORMAL_PHI_IK_PARAMS.referenceDeg;
+  if (initial || !previous) {
+    const referenceCost = formalPlanarKeys().reduce((sum, key) => {
+      const limit = limits[key];
+      const range = Math.max(limit.max - limit.min, 1e-9);
+      return sum + ((candidate.state[key] - reference[key]) / range) ** 2;
+    }, 0);
+    return -candidate.minimumNormalizedMargin + referenceCost * 0.005;
+  }
+  let movement = 0;
+  let smoothness = 0;
+  let posture = 0;
+  let barrier = 0;
+  for (const key of formalPlanarKeys()) {
+    const limit = limits[key];
+    const range = Math.max(limit.max - limit.min, 1e-9);
+    const predicted = previousPrevious
+      ? previous[key] + (previous[key] - previousPrevious[key])
+      : previous[key];
+    movement += ((candidate.state[key] - predicted) / range) ** 2;
+    if (previousPrevious) {
+      smoothness += ((candidate.state[key] - 2 * previous[key] + previousPrevious[key]) / range) ** 2;
+    }
+    const normalizedMargin = Math.max(
+      Math.min(candidate.state[key] - limit.min, limit.max - candidate.state[key]) / range,
+      1e-8,
+    );
+    barrier += 1 / (normalizedMargin + 0.01) ** 2;
+    posture += ((candidate.state[key] - reference[key]) / range) ** 2;
+  }
+  const weights = FORMAL_PHI_IK_PARAMS.weights[ikMode] || FORMAL_PHI_IK_PARAMS.weights.greedy_continuity;
+  return (
+    movement * weights.movement +
+    smoothness * weights.smoothness +
+    posture * weights.posture +
+    barrier * FORMAL_PHI_IK_PARAMS.barrierWeight
+  );
+}
+
+function formalRefineCandidate(localTarget, baseDeg, selected, previous, previousPrevious, ikMode, limits, initial) {
+  let best = selected;
+  let bestScore = formalCandidateScore(best, previous, previousPrevious, ikMode, limits, initial);
+  let halfWidth = Math.max(FORMAL_PHI_IK_PARAMS.candidatePhiStepDeg, 0.02);
+  for (let iteration = 0; iteration < FORMAL_PHI_IK_PARAMS.refinementIterations; iteration += 1) {
+    for (const phiDeg of [best.phiDeg - halfWidth / 2, best.phiDeg + halfWidth / 2]) {
+      const candidate = formalAnalyticCandidateAtPhi(localTarget, baseDeg, phiDeg, best.elbowSign, limits);
+      if (!candidate) continue;
+      const score = formalCandidateScore(candidate, previous, previousPrevious, ikMode, limits, initial);
+      if (score < bestScore) {
+        best = candidate;
+        bestScore = score;
+      }
+    }
+    halfWidth /= 2;
+  }
+  return best;
+}
+
+function formalCandidatesForLocalTarget(localTarget, baseDeg, limits, phiStepDeg) {
+  const phiMinimum = limits.offset.min + FORMAL_PHI_IK_PARAMS.targetToolAbsoluteAngleDeg;
+  const phiMaximum = limits.offset.max + FORMAL_PHI_IK_PARAMS.targetToolAbsoluteAngleDeg;
+  const step = Math.max(0.001, Number(phiStepDeg));
+  const count = Math.max(1, Math.ceil((phiMaximum - phiMinimum) / step));
+  const candidates = [];
+  for (let index = 0; index <= count; index += 1) {
+    const phiDeg = index === count ? phiMaximum : phiMinimum + index * step;
+    for (const elbowSign of [-1, 1]) {
+      const candidate = formalAnalyticCandidateAtPhi(localTarget, baseDeg, phiDeg, elbowSign, limits);
+      if (candidate) candidates.push(candidate);
+    }
+  }
+  return candidates;
+}
+
+function formalSelectCandidate(targetWorld, displayOffset, ikMode, currentState, previousState, previousPreviousState, initial = false) {
+  const limits = formalCandidateLimits();
+  let bestSample = null;
+  let bestScore = Infinity;
+  for (const baseDeg of formalBaseCandidatesForTarget(targetWorld, displayOffset)) {
+    const localTarget = formalLocalTargetForBase(targetWorld, baseDeg, displayOffset);
+    if (localTarget.lateralResidualMm > 0.01) continue;
+    let candidates = formalCandidatesForLocalTarget(localTarget, baseDeg, limits, FORMAL_PHI_IK_PARAMS.candidatePhiStepDeg);
+    if (!candidates.length) {
+      candidates = formalCandidatesForLocalTarget(localTarget, baseDeg, limits, FORMAL_PHI_IK_PARAMS.fallbackPhiStepDeg);
+    }
+    const rejected = new Set();
+    for (let attempt = 0; attempt < Math.min(candidates.length, 24); attempt += 1) {
+      const available = candidates.filter((candidate) => !rejected.has(candidate));
+      if (!available.length) break;
+      let selected = available[0];
+      let selectedScore = formalCandidateScore(selected, previousState, previousPreviousState, ikMode, limits, initial);
+      for (let index = 1; index < available.length; index += 1) {
+        const score = formalCandidateScore(available[index], previousState, previousPreviousState, ikMode, limits, initial);
+        if (score < selectedScore) {
+          selected = available[index];
+          selectedScore = score;
+        }
+      }
+      selected = formalRefineCandidate(localTarget, baseDeg, selected, previousState, previousPreviousState, ikMode, limits, initial);
+      const sample = formalCandidateSample(selected, targetWorld, displayOffset);
+      if (sample.valid) {
+        const baseTieBreak = previousState ? (angleDistance(sample.state.base, previousState.base) / 360) ** 2 * 1e-6 : 0;
+        const score = formalCandidateScore(selected, previousState, previousPreviousState, ikMode, limits, initial) + baseTieBreak;
+        if (score < bestScore) {
+          bestScore = score;
+          bestSample = { ...sample, score, localTarget };
+        }
+        break;
+      }
+      let closest = candidates[0];
+      let distanceToSelected = Infinity;
+      for (const candidate of candidates) {
+        const difference = Math.abs(candidate.phiDeg - selected.phiDeg)
+          + (candidate.elbowSign === selected.elbowSign ? 0 : 1000);
+        if (difference < distanceToSelected) {
+          closest = candidate;
+          distanceToSelected = difference;
+        }
+      }
+      rejected.add(closest);
+    }
+  }
+  return bestSample;
+}
+
+function solveFormalPhiIk(targetWorld, currentState, displayOffset, ikMode, options = {}) {
+  const current = clampState(currentState);
+  const previousState = options.previousState ? clampState(options.previousState) : current;
+  const previousPreviousState = options.previousPreviousState ? clampState(options.previousPreviousState) : null;
+  const initial = !options.previousState;
+  return formalSelectCandidate(targetWorld, displayOffset, ikMode, current, previousState, previousPreviousState, initial);
+}
+
 function solveLinearSystem(matrix, vector) {
   const m = matrix.map((row, index) => [...row, vector[index]]);
   const size = vector.length;
@@ -1238,6 +1560,63 @@ export function solveStateForWorldDisplayedToolTarget(targetWorld, currentState 
     const distance = Math.hypot(displayTip.x - target.x, displayTip.y - target.y, displayTip.z - target.z);
     return ikScoreFromDistance(distance, state, currentState, previousDelta, ikMode);
   };
+
+  if (isFormalPhiIkMode(ikMode)) {
+    const formalSample = solveFormalPhiIk(target, candidate, displayOffset, ikMode, {
+      previousState: options.previousState,
+      previousPreviousState: options.previousPreviousState,
+    });
+    if (formalSample) {
+      const delta = ikDeltaDeg(formalSample.state, currentState);
+      return {
+        state: formalSample.state,
+        pose: formalSample.pose,
+        target,
+        error: formalSample.residualMm,
+        rawError: formalSample.residualMm,
+        ikMode,
+        delta,
+        rateLimited: false,
+        rateLimitScale: 1,
+        metrics: ikStepMetrics(formalSample.state, currentState, previousDelta),
+        actuatorViolation: formalSample.actuatorViolation,
+        reachable: formalSample.residualMm < 1 && Math.abs(formalSample.toolVerticalErrorDeg) < 0.001,
+        formalPhi: {
+          phiDeg: formalSample.phiDeg,
+          elbowSign: formalSample.elbowSign,
+          score: formalSample.score,
+          residualMm: formalSample.residualMm,
+          toolVerticalErrorDeg: formalSample.toolVerticalErrorDeg,
+          minimumNormalizedMargin: formalSample.minimumNormalizedMargin,
+          baseAdaptation: {
+            formula: "local = rotateXYAround(targetWorld, base); choose base so local.y equals displayOffset.y, then solve local.x/local.z with analytic phi",
+            localTarget: formalSample.localTarget,
+          },
+        },
+      };
+    }
+    const currentResidual = distance(currentDisplayTip, target);
+    return {
+      state: candidate,
+      pose: computePose(candidate),
+      target,
+      error: currentResidual,
+      rawError: currentResidual,
+      ikMode,
+      delta: { base: 0, arm1: 0, arm2: 0, arm3: 0, offset: 0 },
+      rateLimited: false,
+      rateLimitScale: 1,
+      metrics: ikStepMetrics(candidate, currentState, previousDelta),
+      actuatorViolation: actuatorStrokeViolationForState(candidate),
+      reachable: false,
+      formalPhi: {
+        error: "no_strict_analytic_phi_candidate",
+        baseAdaptation: {
+          formula: "local = rotateXYAround(targetWorld, base); choose base so local.y equals displayOffset.y, then solve local.x/local.z with analytic phi",
+        },
+      },
+    };
+  }
 
   if (ikMode === IK_MODES.phiScan.key) {
     const phiCandidate = solvePhiScanIk(target, candidate, displayOffset, score, previousDelta);

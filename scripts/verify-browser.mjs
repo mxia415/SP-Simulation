@@ -153,11 +153,11 @@ try {
   if (!defaultResult.modeButtonActive || !defaultResult.debug?.active || defaultResult.debug?.pointCount !== 127) {
     throw new Error(`Default cuboid path must be imported on startup: ${JSON.stringify(defaultResult, null, 2)}`);
   }
-  if (defaultResult.ikMode !== "active5_dls") {
-    throw new Error(`Default IK mode must be Active-5 3D DLS for imported path simulation: ${JSON.stringify(defaultResult, null, 2)}`);
+  if (defaultResult.ikMode !== "posture_priority") {
+    throw new Error(`Default IK mode must be 强姿态解析 φ for imported path simulation: ${JSON.stringify(defaultResult, null, 2)}`);
   }
-  if (defaultResult.scriptVersion !== "20260722-demo-path-v18") {
-    throw new Error(`Script version must cache-bust the demo path update: ${JSON.stringify(defaultResult, null, 2)}`);
+  if (defaultResult.scriptVersion !== "20260723-glb-calibration-pose") {
+    throw new Error(`Script version must cache-bust the GLB calibration pose update: ${JSON.stringify(defaultResult, null, 2)}`);
   }
   const glbAnchorMiss = defaultResult.glbAnchorErrors.find((item) => item.error > 0.001);
   if (glbAnchorMiss) {
@@ -173,13 +173,11 @@ try {
     throw new Error(`Theme switch must expose dark and light options: ${JSON.stringify(defaultResult, null, 2)}`);
   }
   if (JSON.stringify(defaultResult.ikModeOptions) !== JSON.stringify([
-    { value: "original", label: "Original" },
-    { value: "balanced", label: "Balanced" },
-    { value: "improved", label: "Improved" },
-    { value: "phi_scan", label: "Phi Scan" },
-    { value: "active5_dls", label: "Active-5 3D DLS" },
+    { value: "greedy_continuity", label: "局部贪心解析 φ" },
+    { value: "balanced_posture", label: "平衡姿态解析 φ" },
+    { value: "posture_priority", label: "强姿态解析 φ" },
   ])) {
-    throw new Error(`IK selector must expose all five Python simulation algorithms: ${JSON.stringify(defaultResult, null, 2)}`);
+    throw new Error(`IK selector must expose exactly the three formal analytic phi algorithms: ${JSON.stringify(defaultResult, null, 2)}`);
   }
   if (defaultResult.pathRender?.pointMarkers !== 0) {
     throw new Error(`Default imported cuboid path must not show point markers: ${JSON.stringify(defaultResult, null, 2)}`);
@@ -308,8 +306,8 @@ try {
   if (result.pointCount !== "127" || result.mode !== "points" || !result.debug?.active) {
     throw new Error(`Demo path verification failed: ${JSON.stringify(result, null, 2)}`);
   }
-  if (result.ikMode !== "active5_dls" || result.linearMotion?.ikMode !== "active5_dls") {
-    throw new Error(`Active-5 3D DLS IK mode must be reflected in debug state by default: ${JSON.stringify(result, null, 2)}`);
+  if (result.ikMode !== "posture_priority" || result.linearMotion?.ikMode !== "posture_priority") {
+    throw new Error(`Default formal IK mode must be reflected in debug state: ${JSON.stringify(result, null, 2)}`);
   }
   const firstImportedPoint = { x: 3600, y: -2000, z: 0 };
   const simulationPath = result.linearMotion?.pathPoints || [];
@@ -365,92 +363,49 @@ try {
     Math.abs(result.pose?.arm3 - 90) < 0.01 &&
     Math.abs(result.pose?.base) < 0.01;
   const solveError = Number.parseFloat(result.solveErrorText || "NaN");
-  const active5WithinStartupLimits = ["base", "arm1", "arm2", "arm3", "offset"].every((key) => {
-    const limit = { base: 1, arm1: 2, arm2: 2, arm3: 2, offset: 1 }[key];
-    return Math.abs(Number(result.linearMotion?.previousIkDelta?.[key] || 0)) <= limit + 0.001;
-  });
-  if (poseStillVertical || !Number.isFinite(solveError) || !active5WithinStartupLimits) {
-    throw new Error(`Demo path progress must solve a non-vertical rate-limited Active-5 IK pose: ${JSON.stringify(result, null, 2)}`);
+  const formalIkHistoryValid = ["base", "arm1", "arm2", "arm3", "offset"].every((key) =>
+    Number.isFinite(Number(result.linearMotion?.previousIkDelta?.[key]))
+  );
+  if (poseStillVertical || !Number.isFinite(solveError) || solveError > 1 || !formalIkHistoryValid) {
+    throw new Error(`Demo path progress must solve a non-vertical strict analytic phi IK pose: ${JSON.stringify(result, null, 2)}`);
   }
   if (!result.coordinateSystem?.includes("3D视角 X/Y/Z") || !result.coordinateNote?.includes("Z为高度")) {
     throw new Error(`Coordinate note verification failed: ${JSON.stringify(result, null, 2)}`);
   }
 
-  await page.selectOption("#linearIkMode", "balanced");
-  await page.fill("#linearProgressNumber", "50");
-  await page.dispatchEvent("#linearProgressNumber", "change");
-  const balancedResult = await page.evaluate(() => ({
-    ikMode: document.querySelector("#linearIkMode")?.value,
-    linearMotion: window.__lingzhuDebug.linearMotion,
-    solveErrorText: document.querySelector("#linearSolveError")?.value,
-    bootErrors: window.__lingzhuBootErrors,
-  }));
-  if (balancedResult.bootErrors?.length) {
-    throw new Error(`Balanced IK switch produced boot errors: ${JSON.stringify(balancedResult, null, 2)}`);
-  }
-  if (balancedResult.ikMode !== "balanced" || balancedResult.linearMotion?.ikMode !== "balanced") {
-    throw new Error(`Balanced IK mode must be selectable and reflected in debug state: ${JSON.stringify(balancedResult, null, 2)}`);
-  }
-  if (!Number.isFinite(balancedResult.linearMotion?.previousIkDelta?.arm1)) {
-    throw new Error(`Balanced IK simulation must retain previous joint delta: ${JSON.stringify(balancedResult, null, 2)}`);
-  }
-
-  await page.selectOption("#linearIkMode", "improved");
-  await page.fill("#linearProgressNumber", "50");
-  await page.dispatchEvent("#linearProgressNumber", "change");
-  const improvedResult = await page.evaluate(() => ({
-    ikMode: document.querySelector("#linearIkMode")?.value,
-    linearMotion: window.__lingzhuDebug.linearMotion,
-    solveErrorText: document.querySelector("#linearSolveError")?.value,
-    bootErrors: window.__lingzhuBootErrors,
-  }));
-  if (improvedResult.bootErrors?.length) {
-    throw new Error(`Improved IK switch produced boot errors: ${JSON.stringify(improvedResult, null, 2)}`);
-  }
-  if (improvedResult.ikMode !== "improved" || improvedResult.linearMotion?.ikMode !== "improved") {
-    throw new Error(`Improved IK mode must be selectable and reflected in debug state: ${JSON.stringify(improvedResult, null, 2)}`);
-  }
-  if (!Number.isFinite(improvedResult.linearMotion?.previousIkDelta?.arm1)) {
-    throw new Error(`Improved IK simulation must retain previous joint delta: ${JSON.stringify(improvedResult, null, 2)}`);
-  }
-
-  await page.selectOption("#linearIkMode", "phi_scan");
-  await page.fill("#linearProgressNumber", "50");
-  await page.dispatchEvent("#linearProgressNumber", "change");
-  const phiScanResult = await page.evaluate(() => ({
-    ikMode: document.querySelector("#linearIkMode")?.value,
-    linearMotion: window.__lingzhuDebug.linearMotion,
-    bootErrors: window.__lingzhuBootErrors,
-  }));
-  if (phiScanResult.bootErrors?.length) {
-    throw new Error(`Phi Scan IK switch produced boot errors: ${JSON.stringify(phiScanResult, null, 2)}`);
-  }
-  if (phiScanResult.ikMode !== "phi_scan" || phiScanResult.linearMotion?.ikMode !== "phi_scan") {
-    throw new Error(`Phi Scan IK mode must be selectable and reflected in debug state: ${JSON.stringify(phiScanResult, null, 2)}`);
-  }
-  if (!Number.isFinite(phiScanResult.linearMotion?.previousIkDelta?.arm1)) {
-    throw new Error(`Phi Scan IK simulation must retain previous joint delta: ${JSON.stringify(phiScanResult, null, 2)}`);
-  }
-
-  await page.selectOption("#linearIkMode", "active5_dls");
-  await page.fill("#linearProgressNumber", "50");
-  await page.dispatchEvent("#linearProgressNumber", "change");
-  const active5DlsResult = await page.evaluate(() => ({
-    ikMode: document.querySelector("#linearIkMode")?.value,
-    linearMotion: window.__lingzhuDebug.linearMotion,
-    bootErrors: window.__lingzhuBootErrors,
-  }));
-  if (active5DlsResult.bootErrors?.length) {
-    throw new Error(`Active-5 3D DLS IK switch produced boot errors: ${JSON.stringify(active5DlsResult, null, 2)}`);
-  }
-  if (active5DlsResult.ikMode !== "active5_dls" || active5DlsResult.linearMotion?.ikMode !== "active5_dls") {
-    throw new Error(`Active-5 3D DLS IK mode must be selectable and reflected in debug state: ${JSON.stringify(active5DlsResult, null, 2)}`);
-  }
-  if (
-    !Number.isFinite(active5DlsResult.linearMotion?.previousIkDelta?.base) ||
-    !Number.isFinite(active5DlsResult.linearMotion?.previousIkDelta?.offset)
-  ) {
-    throw new Error(`Active-5 3D DLS simulation must retain five-joint previous delta: ${JSON.stringify(active5DlsResult, null, 2)}`);
+  const formalModes = ["greedy_continuity", "balanced_posture", "posture_priority"];
+  for (const mode of formalModes) {
+    await page.selectOption("#linearIkMode", mode);
+    await page.fill("#linearProgressNumber", "50");
+    await page.dispatchEvent("#linearProgressNumber", "change");
+    const modeResult = await page.evaluate(() => ({
+      requestedMode: document.querySelector("#linearIkMode")?.value,
+      linearMotion: window.__lingzhuDebug.linearMotion,
+      solveErrorText: document.querySelector("#linearSolveError")?.value,
+      pose: window.__lingzhuDebug.pose,
+      bootErrors: window.__lingzhuBootErrors,
+    }));
+    const modeSolveError = Number.parseFloat(modeResult.solveErrorText || "NaN");
+    const finiteDelta = ["base", "arm1", "arm2", "arm3", "offset"].every((key) =>
+      Number.isFinite(Number(modeResult.linearMotion?.previousIkDelta?.[key]))
+    );
+    const verticalTool = Math.abs(Number(modeResult.pose?.absoluteAngles?.tool) + 90) < 0.01;
+    if (
+      modeResult.bootErrors?.length ||
+      modeResult.requestedMode !== mode ||
+      modeResult.linearMotion?.ikMode !== mode ||
+      !Number.isFinite(modeSolveError) ||
+      modeSolveError > 1 ||
+      !finiteDelta ||
+      !verticalTool
+    ) {
+      throw new Error(`Formal analytic phi IK mode failed in browser: ${JSON.stringify(modeResult, null, 2)}`);
+    }
+    await page.click("#returnLinearStart");
+    await page.click("#simulateLinearMotion");
+    await page.waitForFunction(() => window.__lingzhuDebug.linearMotion?.isSimulating === true, null, { timeout: 1000 });
+    await page.click("#returnLinearStart");
+    await page.waitForFunction(() => window.__lingzhuDebug.linearMotion?.isSimulating === false, null, { timeout: 3000 });
   }
 
   await page.click("#returnLinearStart");
@@ -482,12 +437,11 @@ try {
     },
     startState: window.__lingzhuDebug.linearMotion?.startState,
   }));
-  const firstMotionFrameWithinDisplayLimit = ["base", "arm1", "arm2", "arm3", "offset"].every((key) => {
-    const limit = { base: 1, arm1: 2, arm2: 2, arm3: 2, offset: 1 }[key];
-    return Math.abs(Number(highSpeedFirstMotionFrame.state?.[key]) - Number(highSpeedFirstMotionFrame.startState?.[key])) <= limit + 0.001;
-  });
-  if (!firstMotionFrameWithinDisplayLimit) {
-    throw new Error(`High-speed simulation must not accumulate multiple IK substeps before the next rendered frame: ${JSON.stringify(highSpeedFirstMotionFrame, null, 2)}`);
+  const firstMotionFrameSolved = ["base", "arm1", "arm2", "arm3", "offset"].every((key) =>
+    Number.isFinite(Number(highSpeedFirstMotionFrame.state?.[key]))
+  );
+  if (!firstMotionFrameSolved) {
+    throw new Error(`High-speed simulation must produce a finite formal IK pose on the first moving frame: ${JSON.stringify(highSpeedFirstMotionFrame, null, 2)}`);
   }
 
   await page.waitForTimeout(500);
@@ -496,8 +450,8 @@ try {
     solveErrorText: document.querySelector("#linearSolveError")?.value,
   }));
   const highSpeedFollowError = Number.parseFloat(highSpeedFollowResult.solveErrorText || "NaN");
-  if (highSpeedFollowResult.commandDistanceMm > 1500 || !Number.isFinite(highSpeedFollowError) || highSpeedFollowError > 120) {
-    throw new Error(`High-speed simulation must adapt feed to keep the tool near the commanded path: ${JSON.stringify(highSpeedFollowResult, null, 2)}`);
+  if (!Number.isFinite(highSpeedFollowError) || highSpeedFollowError > 1) {
+    throw new Error(`High-speed simulation must keep the formal IK tool solution on the commanded path: ${JSON.stringify(highSpeedFollowResult, null, 2)}`);
   }
 
   await page.evaluate(() => document.querySelector("#simulateLinearMotion")?.click());

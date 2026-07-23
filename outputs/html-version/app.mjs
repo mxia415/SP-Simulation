@@ -11,6 +11,9 @@ import {
   ACTUATOR_STROKE_LIMITS,
   CALIBRATION_STATE,
   DEFAULT_STATE,
+  DEFAULT_FORMAL_IK_MODE,
+  FORMAL_IK_MODE_KEYS,
+  IK_MODES,
   JOINTS,
   LIMITS,
   PRESETS,
@@ -32,7 +35,7 @@ import {
   sceneToDevicePointData,
 } from "./coordinates.mjs";
 
-const SCRIPT_VERSION = "20260722-demo-path-v18";
+const SCRIPT_VERSION = "20260723-glb-calibration-pose";
 const RENDER_SCALE = 1 / 1000;
 const QT_STAGE_MODE = new URLSearchParams(window.location.search).has("qtStage");
 if (QT_STAGE_MODE) document.documentElement.dataset.qtStage = "true";
@@ -618,8 +621,10 @@ const linearMotion = {
   pathMode: "interpolated",
   pathSourceName: "",
   pathStatus: "未导入路径文件",
-  ikMode: "active5_dls",
+  ikMode: DEFAULT_FORMAL_IK_MODE,
   previousIkDelta: { base: 0, arm1: 0, arm2: 0, arm3: 0, offset: 0 },
+  previousIkState: null,
+  previousPreviousIkState: null,
   progress: 0,
   speed: 500,
   animationFrame: null,
@@ -1694,11 +1699,9 @@ function createLinearControls() {
       <label>末端速度 mm/s <input id="linearSpeed" type="number" min="1" step="10" value="${linearMotion.speed}" /></label>
       <label>IK算法
         <select id="linearIkMode">
-          <option value="original">Original</option>
-          <option value="balanced">Balanced</option>
-          <option value="improved">Improved</option>
-          <option value="phi_scan">Phi Scan</option>
-          <option value="active5_dls">Active-5 3D DLS</option>
+          <option value="${IK_MODES.greedyContinuity.key}">${IK_MODES.greedyContinuity.label}</option>
+          <option value="${IK_MODES.balancedPosture.key}">${IK_MODES.balancedPosture.label}</option>
+          <option value="${IK_MODES.posturePriority.key}">${IK_MODES.posturePriority.label}</option>
         </select>
       </label>
       <label>路径长度 <output id="linearPathDistance">0 mm</output></label>
@@ -1761,9 +1764,9 @@ function createLinearControls() {
   });
   document.querySelector("#linearIkMode").addEventListener("change", (event) => {
     stopLinearSimulation();
-    linearMotion.ikMode = ["balanced", "improved", "phi_scan", "active5_dls"].includes(event.target.value)
+    linearMotion.ikMode = FORMAL_IK_MODE_KEYS.includes(event.target.value)
       ? event.target.value
-      : "original";
+      : DEFAULT_FORMAL_IK_MODE;
     resetLinearIkHistory();
     runLinearMotion({ resetToStartState: importedLinearPathActive() });
   });
@@ -1809,6 +1812,8 @@ function linearPathDistance() {
 
 function resetLinearIkHistory() {
   linearMotion.previousIkDelta = { base: 0, arm1: 0, arm2: 0, arm3: 0, offset: 0 };
+  linearMotion.previousIkState = null;
+  linearMotion.previousPreviousIkState = null;
 }
 
 function resetLinearPlaybackDistance() {
@@ -2113,14 +2118,22 @@ function runLinearMotion({ resetToStartState = false, targetDistanceMm = null, i
   const solved = solveStateForWorldDisplayedToolTarget(target, state, TOOL_BALL_STICK_OFFSET_MM, {
     ikMode: linearMotion.ikMode,
     previousDelta: linearMotion.previousIkDelta,
+    previousState: linearMotion.previousIkState,
+    previousPreviousState: linearMotion.previousPreviousIkState,
     stepScale: ikStepScale,
   });
   commitLinearMotionSolution(solved);
 }
 
+function advanceLinearIkHistory(nextState, delta) {
+  linearMotion.previousPreviousIkState = linearMotion.previousIkState ? { ...linearMotion.previousIkState } : null;
+  linearMotion.previousIkState = { ...nextState };
+  linearMotion.previousIkDelta = delta || linearMotion.previousIkDelta;
+}
+
 function commitLinearMotionSolution(solved) {
   Object.assign(state, solved.state);
-  linearMotion.previousIkDelta = solved.delta || linearMotion.previousIkDelta;
+  advanceLinearIkHistory(solved.state, solved.delta);
   applyToolVerticalConstraint();
   update(solved.error);
 }
@@ -2129,6 +2142,8 @@ function solveLinearMotionAtDistance(distanceMm, ikStepScale, sourceState = stat
   return solveStateForWorldDisplayedToolTarget(linearTargetFromDistance(distanceMm), sourceState, TOOL_BALL_STICK_OFFSET_MM, {
     ikMode: linearMotion.ikMode,
     previousDelta,
+    previousState: linearMotion.previousIkState,
+    previousPreviousState: linearMotion.previousPreviousIkState,
     stepScale: ikStepScale,
   });
 }
@@ -2191,6 +2206,8 @@ function returnLinearToStart() {
     const solved = solveStateForWorldDisplayedToolTarget(linearMotion.startWorld, state, TOOL_BALL_STICK_OFFSET_MM, {
       ikMode: linearMotion.ikMode,
       previousDelta: linearMotion.previousIkDelta,
+      previousState: linearMotion.previousIkState,
+      previousPreviousState: linearMotion.previousPreviousIkState,
     });
     Object.assign(state, solved.state);
   }
@@ -2339,9 +2356,11 @@ function setLinearDraggedTarget(worldPoint) {
   const solved = solveStateForWorldDisplayedToolTarget(targetWorld, state, TOOL_BALL_STICK_OFFSET_MM, {
     ikMode: linearMotion.ikMode,
     previousDelta: linearMotion.previousIkDelta,
+    previousState: linearMotion.previousIkState,
+    previousPreviousState: linearMotion.previousPreviousIkState,
   });
   Object.assign(state, solved.state);
-  linearMotion.previousIkDelta = solved.delta || linearMotion.previousIkDelta;
+  advanceLinearIkHistory(solved.state, solved.delta);
   applyToolVerticalConstraint();
   linearMotion.endWorld = targetWorld;
   linearMotion.progress = 100;
