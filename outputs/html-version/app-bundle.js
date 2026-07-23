@@ -28056,7 +28056,7 @@ void main() {
   }
 
   // outputs/html-version/app.mjs
-  var SCRIPT_VERSION = "20260723-base-meshopt";
+  var SCRIPT_VERSION = "20260723-defer-base";
   var RENDER_SCALE = 1 / 1e3;
   var QT_STAGE_MODE = new URLSearchParams(window.location.search).has("qtStage");
   if (QT_STAGE_MODE) document.documentElement.dataset.qtStage = "true";
@@ -28650,7 +28650,7 @@ void main() {
       "base",
       { visible: true, x: -3050, y: -135, z: -1590, rx: 0, ry: 0, rz: -90, scale: 1, unitScale: 1 },
       null,
-      { locked: true }
+      { locked: true, deferred: true }
     ),
     baseLink: makeModelController(
       "baseLink",
@@ -29042,6 +29042,7 @@ void main() {
       group,
       model,
       loaded: false,
+      deferred: options.deferred === true,
       childCount: 0,
       stats: { source: "pending", bytes: 0 },
       error: null,
@@ -30513,7 +30514,12 @@ void main() {
     update();
   }
   async function loadModelsInQueue(controllers, concurrency = GLB_LOAD_CONCURRENCY) {
-    const queue = controllers.filter(Boolean);
+    for (const controller of controllers.filter((item) => item?.deferred)) {
+      const status = document.querySelector(`#${controller.key}ModelStatus`);
+      controller.stats.source = "deferred";
+      if (status) status.textContent = "\u5EF6\u540E\u52A0\u8F7D";
+    }
+    const queue = controllers.filter((controller) => controller && !controller.deferred);
     let cursor = 0;
     async function worker() {
       while (cursor < queue.length) {
@@ -30815,6 +30821,7 @@ void main() {
         modelPosition: controller.model.position.toArray(),
         modelQuaternion: controller.model.quaternion.toArray(),
         modelScale: controller.model.scale.toArray(),
+        deferred: controller.deferred,
         anchorLocal: controller.anchorLocal,
         anchorUnits: controller.anchorUnits,
         modelAnchorWorld: controller.lastModelAnchorWorld,

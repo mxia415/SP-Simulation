@@ -27,7 +27,7 @@ The build script copies the web app into `dist/`.
 ## Current Web State
 
 - Visible page version: `V1.9 · 2026-07-23`
-- Current script/cache token: `20260723-base-meshopt`
+- Current script/cache token: `20260723-defer-base`
 - Default path control: `路径演示`; it loads the bundled demo CSV instead of showing a CSV/JSON upload button.
 - Default IK mode: `posture_priority` / `强姿态解析 φ`
 - Ordinary IK selector exposes exactly:
@@ -35,7 +35,7 @@ The build script copies the web app into `dist/`.
   - `balanced_posture` / `平衡姿态解析 φ`
   - `posture_priority` / `强姿态解析 φ`
 - GLB binding reference pose is the unclamped calibration pose. In particular, arm1 is calibrated at `90°` even though the motion limit is `83.8189°`.
-- `base.glb` is Meshopt-compressed for faster Cloudflare loading; keep `base-model.js` synchronized for `file://` fallback.
+- `base.glb` is Meshopt-compressed and deferred on Cloudflare so the moving arm, cylinders, linkages, and tool load first; keep `base-model.js` synchronized for `file://` fallback.
 - Imported path simulation starts from the initial print pose `{ arm1: 81, arm2: 72, arm3: 49, offset: 50, base: 4 }`, then moves to the path start.
 
 ## Common Commands

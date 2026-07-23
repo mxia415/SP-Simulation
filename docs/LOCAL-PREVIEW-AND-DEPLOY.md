@@ -140,4 +140,4 @@ The current Cloudflare build script copies `outputs/html-version/` and root redi
 Current control-page metadata:
 
 - Visible version: `V1.9 · 2026-07-23`
-- Script/cache token: `20260723-base-meshopt`
+- Script/cache token: `20260723-defer-base`

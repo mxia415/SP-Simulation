@@ -35,7 +35,7 @@ import {
   sceneToDevicePointData,
 } from "./coordinates.mjs";
 
-const SCRIPT_VERSION = "20260723-base-meshopt";
+const SCRIPT_VERSION = "20260723-defer-base";
 const RENDER_SCALE = 1 / 1000;
 const QT_STAGE_MODE = new URLSearchParams(window.location.search).has("qtStage");
 if (QT_STAGE_MODE) document.documentElement.dataset.qtStage = "true";
@@ -659,7 +659,7 @@ const modelControllers = {
     "base",
     { visible: true, x: -3050, y: -135, z: -1590, rx: 0, ry: 0, rz: -90, scale: 1, unitScale: 1 },
     null,
-    { locked: true },
+    { locked: true, deferred: true },
   ),
   baseLink: makeModelController(
     "baseLink",
@@ -1054,6 +1054,7 @@ function makeModelController(key, label, glbPath, fallbackPath, fallbackKey, ini
     group,
     model,
     loaded: false,
+    deferred: options.deferred === true,
     childCount: 0,
     stats: { source: "pending", bytes: 0 },
     error: null,
@@ -2747,7 +2748,12 @@ async function loadModel(controller) {
 }
 
 async function loadModelsInQueue(controllers, concurrency = GLB_LOAD_CONCURRENCY) {
-  const queue = controllers.filter(Boolean);
+  for (const controller of controllers.filter((item) => item?.deferred)) {
+    const status = document.querySelector(`#${controller.key}ModelStatus`);
+    controller.stats.source = "deferred";
+    if (status) status.textContent = "延后加载";
+  }
+  const queue = controllers.filter((controller) => controller && !controller.deferred);
   let cursor = 0;
   async function worker() {
     while (cursor < queue.length) {
@@ -3063,6 +3069,7 @@ function update(linearError = 0) {
       modelPosition: controller.model.position.toArray(),
       modelQuaternion: controller.model.quaternion.toArray(),
       modelScale: controller.model.scale.toArray(),
+      deferred: controller.deferred,
       anchorLocal: controller.anchorLocal,
       anchorUnits: controller.anchorUnits,
       modelAnchorWorld: controller.lastModelAnchorWorld,

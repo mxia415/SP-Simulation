@@ -156,7 +156,7 @@ posture_priority: { movement: 0.8, smoothness: 2.5, posture: 0.012 }
 - Ball-stick coordinates are the source of truth.
 - Runtime GLB pose follows ball-stick target points through reference-pose anchors.
 - GLB binding reference pose must be generated from `CALIBRATION_STATE` with limit clamping disabled (`computePose(CALIBRATION_STATE, { clampLimits: false })` in the current code). Arm1 must remain `90°` in this reference.
-- The deployable base model is Meshopt-compressed for Cloudflare loading speed. When replacing it, regenerate `outputs/html-version/assets/base-model.js` from the exact deployable GLB bytes for `file://` fallback.
+- The deployable base model is Meshopt-compressed and deferred on Cloudflare so it does not block the moving arm, cylinders, linkages, and tool from becoming usable. When replacing it, regenerate `outputs/html-version/assets/base-model.js` from the exact deployable GLB bytes for `file://` fallback.
 - If ball-stick coordinates change but GLB files do not, recompute/follow against the new ball-stick points; do not hand-tune model positions.
 - Verify `modelAnchorWorld` matches `targetAnchorWorld` for every followed GLB within `0.001 mm`.
 - A local worktree without `git-lfs` may contain 130 byte `.glb` pointer files; that causes all GLBs to show as not loaded even when code is correct.
@@ -173,4 +173,4 @@ posture_priority: { movement: 0.8, smoothness: 2.5, posture: 0.012 }
 Current visible metadata:
 
 - Page version: `V1.9 · 2026-07-23`
-- Script/cache token: `20260723-base-meshopt`
+- Script/cache token: `20260723-defer-base`

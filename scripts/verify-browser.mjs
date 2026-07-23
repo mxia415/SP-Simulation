@@ -82,7 +82,7 @@ try {
   await page.waitForFunction(
     () => Object.keys(window.__lingzhuDebug || {})
       .filter((key) => key.endsWith("Model"))
-      .every((key) => window.__lingzhuDebug[key]?.loaded),
+      .every((key) => window.__lingzhuDebug[key]?.loaded || window.__lingzhuDebug[key]?.deferred),
     null,
     { timeout: 90000 },
   );
@@ -132,6 +132,8 @@ try {
     debug: window.__lingzhuDebug.importedLinearPath,
     pathRender: window.__lingzhuDebug.pathRender,
     scriptVersion: window.__lingzhuDebug.scriptVersion,
+    deferredModels: Object.keys(window.__lingzhuDebug)
+      .filter((key) => key.endsWith("Model") && window.__lingzhuDebug[key]?.deferred),
     glbAnchorErrors: Object.keys(window.__lingzhuDebug)
       .filter((key) => key.endsWith("Model"))
       .map((key) => {
@@ -156,8 +158,11 @@ try {
   if (defaultResult.ikMode !== "posture_priority") {
     throw new Error(`Default IK mode must be 强姿态解析 φ for imported path simulation: ${JSON.stringify(defaultResult, null, 2)}`);
   }
-  if (defaultResult.scriptVersion !== "20260723-base-meshopt") {
+  if (defaultResult.scriptVersion !== "20260723-defer-base") {
     throw new Error(`Script version must cache-bust the GLB calibration pose update: ${JSON.stringify(defaultResult, null, 2)}`);
+  }
+  if (JSON.stringify(defaultResult.deferredModels) !== JSON.stringify(["baseModel"])) {
+    throw new Error(`Only the heavy base GLB may be deferred: ${JSON.stringify(defaultResult, null, 2)}`);
   }
   const glbAnchorMiss = defaultResult.glbAnchorErrors.find((item) => item.error > 0.001);
   if (glbAnchorMiss) {
